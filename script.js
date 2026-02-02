@@ -45,6 +45,16 @@ const state = {
     
     // Resynchronisation périodique
     boardSyncInterval: null,
+    
+    // Couleur persistante
+    userColor: null,
+    
+    // Scoreboard (utilisateurs en ligne)
+    onlineUsers: {}, // {uid: {name, faction}}
+    showScoreboard: false,
+    scoreboardUpdateInterval: null,
+
+    onlineCountUpdateInterval: null,
 
     scoreUpdateTimer: null, renderLoopId: null
 };
@@ -73,6 +83,14 @@ async function handleAuthState(user) {
             const doc = await firestore.collection('users').doc(user.uid).get();
             if (!doc.exists) { await auth.signOut(); return; }
             state.user = user; state.userProfile = doc.data();
+            
+            // Charger la couleur persistante de l'utilisateur
+            const userData = doc.data();
+            if (userData.selected_color && CONFIG.PALETTE.includes(userData.selected_color)) {
+                state.selectedColor = userData.selected_color;
+                state.userColor = userData.selected_color;
+            }
+            
             updateUserInterface(); initGameEngine();
             document.getElementById('loading-screen').classList.add('hidden');
             document.getElementById('auth-screen').classList.add('hidden');
@@ -352,6 +370,7 @@ function initGameEngine() {
     state.camera.zoom = 1.5;
     resizeCanvas(); window.addEventListener('resize', resizeCanvas);
     startRealtimeSync(); setupCanvasInput();
+    setupScoreboardInput();
     if (state.renderLoopId) cancelAnimationFrame(state.renderLoopId);
     
     // Afficher le pop-up de bienvenue (déverrouille musique et carte)
@@ -436,9 +455,11 @@ function startRealtimeSync() {
     loadBoardData();
     
     // Resynchronisation complète toutes les 5 secondes
+    if (state.boardSyncInterval) clearInterval(state.boardSyncInterval);
     state.boardSyncInterval = setInterval(loadBoardData, 5000);
     
     // Écouter SEULEMENT les CHANGEMENTS futurs, pas les données existantes
+    db.ref('board').off('child_changed', handlePixelUpdate);
     db.ref('board').on('child_changed', handlePixelUpdate);
     
     db.ref(`users/${state.user.uid}/last_pixel`).on('value', snap => {
@@ -456,6 +477,7 @@ function startRealtimeSync() {
     });
     
     // Heartbeat toutes les 30 secondes pour maintenir la présence
+    if (state.presenceHeartbeatInterval) clearInterval(state.presenceHeartbeatInterval);
     state.presenceHeartbeatInterval = setInterval(() => {
         if (state.user && db) {
             db.ref(`status/${state.user.uid}`).set(firebase.database.ServerValue.TIMESTAMP)
@@ -464,10 +486,25 @@ function startRealtimeSync() {
     }, 30000);
     
     // Compter et afficher les utilisateurs en ligne
-    db.ref('status').on('value', snap => {
-        const onlineCount = snap.numChildren();
-        document.getElementById('online-count').textContent = onlineCount;
-    });
+    const updateOnlineCount = async () => {
+        try {
+            const snap = await db.ref('status').once('value');
+            document.getElementById('online-count').textContent = snap.numChildren();
+        } catch (err) {
+            console.warn('Erreur updateOnlineCount:', err);
+        }
+    };
+    
+    updateOnlineCount();
+    if (state.onlineCountUpdateInterval) clearInterval(state.onlineCountUpdateInterval);
+    state.onlineCountUpdateInterval = setInterval(updateOnlineCount, 5000);
+    
+    // Mettre à jour le scoreboard toutes les 5 secondes
+    updateOnlineUsersList();
+    if (state.scoreboardUpdateInterval) clearInterval(state.scoreboardUpdateInterval);
+    state.scoreboardUpdateInterval = setInterval(() => {
+        updateOnlineUsersList();
+    }, 5000);
 }
 function handlePixelUpdate(snap) {
     try {
@@ -530,6 +567,137 @@ async function fetchUserName(uid) {
     } catch (err) {
         console.warn('Erreur fetch userName:', err);
         state.userNamesCache[uid] = '?';
+    }
+}
+
+/* ================= SCOREBOARD ================= */
+async function updateOnlineUsersList() {
+    try {
+        // Récupérer la liste des utilisateurs en ligne depuis Realtime DB
+        const statusSnap = await db.ref('status').once('value');
+        const onlineUids = Object.keys(statusSnap.val() || {});
+        
+        if (onlineUids.length === 0) {
+            state.onlineUsers = {};
+            if (state.showScoreboard) {
+                renderScoreboard();
+            }
+            return;
+        }
+        
+        // Récupérer les infos de tous les utilisateurs en ligne depuis Firestore en parallèle
+        const userPromises = onlineUids.map(uid => 
+            firestore.collection('users').doc(uid).get()
+                .then(doc => {
+                    if (doc.exists) {
+                        const userData = doc.data();
+                        return {
+                            uid: uid,
+                            name: userData.username || 'Inconnu',
+                            faction: userData.faction || 0
+                        };
+                    }
+                    return null;
+                })
+                .catch(err => {
+                    console.warn(`Erreur fetch user ${uid}:`, err);
+                    return null;
+                })
+        );
+        
+        // Attendre que toutes les requêtes se terminent
+        const results = await Promise.all(userPromises);
+        
+        // Construire le nouvel objet d'utilisateurs en ligne (filtre les nulls)
+        const newOnlineUsers = {};
+        results.forEach(user => {
+            if (user) {
+                newOnlineUsers[user.uid] = {
+                    name: user.name,
+                    faction: user.faction
+                };
+            }
+        });
+        
+        // Comparer avec l'ancien état pour détecter les changements
+        const oldCount = Object.keys(state.onlineUsers).length;
+        const newCount = Object.keys(newOnlineUsers).length;
+        
+        let dataChanged = oldCount !== newCount;
+        
+        // Vérifier si les données des utilisateurs ont changé
+        if (!dataChanged) {
+            for (let uid in newOnlineUsers) {
+                if (!state.onlineUsers[uid] || 
+                    state.onlineUsers[uid].name !== newOnlineUsers[uid].name) {
+                    dataChanged = true;
+                    break;
+                }
+            }
+        }
+        
+        // Mettre à jour SEULEMENT si changement détecté
+        if (dataChanged) {
+            state.onlineUsers = newOnlineUsers;
+            console.log(`Scoreboard mis à jour: ${newCount} joueurs en ligne`);
+            
+            // Mettre à jour l'affichage du scoreboard si visible
+            if (state.showScoreboard) {
+                renderScoreboard();
+            }
+        }
+    } catch (err) {
+        console.warn('Erreur updateOnlineUsersList:', err);
+    }
+}
+
+function renderScoreboard() {
+    const listContainer = document.getElementById('scoreboard-list');
+    if (!listContainer) return;
+    
+    const sortedUsers = Object.entries(state.onlineUsers).sort((a, b) => {
+        return (a[1].name || '').localeCompare((b[1].name || ''), 'fr', { sensitivity: 'base' });
+    });
+    
+    // Vider et reconstruire complètement la liste
+    listContainer.innerHTML = '';
+    
+    if (sortedUsers.length === 0) {
+        listContainer.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">Aucun joueur en ligne</div>';
+        return;
+    }
+    
+    // Créer les éléments du classement
+    sortedUsers.forEach((entry, index) => {
+        const [uid, userData] = entry;
+        const factionInfo = CONFIG.FACTIONS[userData.faction];
+        const factionClass = factionInfo ? factionInfo.cssClass : '';
+        
+        const li = document.createElement('div');
+        li.className = `scoreboard-item ${factionClass}`;
+        li.innerHTML = `
+            <div class="scoreboard-item-name">${userData.name}</div>
+            <div class="scoreboard-item-faction ${factionClass}">${factionInfo?.name || '?'}</div>
+        `;
+        
+        listContainer.appendChild(li);
+    });
+}
+
+function toggleScoreboard(show) {
+    const container = document.getElementById('scoreboard-container');
+    if (!container) return;
+    
+    state.showScoreboard = show;
+    
+    if (show) {
+        container.classList.remove('hidden');
+        // Afficher immédiatement la liste existante (sinon panneau vide si aucune donnée n'a changé)
+        renderScoreboard();
+        // Puis rafraîchir les données
+        updateOnlineUsersList();
+    } else {
+        container.classList.add('hidden');
     }
 }
 
@@ -730,6 +898,22 @@ function setupCanvasInput() {
         state.camera.zoom = Math.min(Math.max(0.1, z), 10);
     }, {passive:false});
 }
+
+function setupScoreboardInput() {
+    // Afficher/masquer le scoreboard avec la touche Tab
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            toggleScoreboard(true);
+        }
+    });
+    
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Tab') {
+            toggleScoreboard(false);
+        }
+    });
+}
 function onDown(e) {
     state.isDragging = true; state.dragStartTime = Date.now();
     state.lastMouse = { x: e.clientX, y: e.clientY }; state.dragStartPos = { x: e.clientX, y: e.clientY };
@@ -788,6 +972,9 @@ function handleBoardClick(sx, sy, event) {
     updates[`board/${key}`] = { c: color, f: fId, u: state.user.uid, t: firebase.database.ServerValue.TIMESTAMP };
     updates[`users/${state.user.uid}/last_pixel`] = firebase.database.ServerValue.TIMESTAMP;
     
+    // Incrémenter le compteur de pixels
+    updates[`users/${state.user.uid}/pixels_placed`] = firebase.database.ServerValue.increment(1);
+    
     db.ref().update(updates).then(() => {
         showToast(`Pixel posé (${CONFIG.FACTIONS[fId].name})`, "success");
         state.nextPixelTime = Date.now() + CONFIG.COOLDOWN_MS;
@@ -811,6 +998,12 @@ function setupPalette() {
         if(c===state.selectedColor) d.classList.add('active');
         d.onclick = () => {
             state.selectedColor = c;
+            state.userColor = c;
+            // Sauvegarder la couleur dans Firestore
+            firestore.collection('users').doc(state.user.uid).update({
+                selected_color: c
+            }).catch(err => console.warn('Erreur sauvegarde couleur:', err));
+            
             document.querySelectorAll('.color-swatch').forEach(e=>e.classList.remove('active'));
             d.classList.add('active');
             if(window.innerWidth < 768) document.getElementById('palette-container').classList.add('collapsed-mobile');
@@ -822,6 +1015,8 @@ function setupPalette() {
         // Nettoyer tous les intervals et la présence avant déconnexion
         if (state.presenceHeartbeatInterval) clearInterval(state.presenceHeartbeatInterval);
         if (state.boardSyncInterval) clearInterval(state.boardSyncInterval);
+        if (state.scoreboardUpdateInterval) clearInterval(state.scoreboardUpdateInterval);
+        if (state.onlineCountUpdateInterval) clearInterval(state.onlineCountUpdateInterval);
         if (state.user) db.ref(`status/${state.user.uid}`).remove();
         auth.signOut().then(() => location.reload());
     };
