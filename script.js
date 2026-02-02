@@ -6,7 +6,7 @@
 const CONFIG = {
     BOARD_SIZE: 150,
     PIXEL_SCALE: 20,
-    COOLDOWN_MS: 120000,
+    COOLDOWN_MS: 60000,
     DOUBLE_CLICK_THRESHOLD: 300,
     ADMIN_USER: "noeb",
     
@@ -1093,4 +1093,5 @@ function playSound(type) {
     } catch (err) {
         console.warn('Erreur playSound:', err);
     }
+
 }
