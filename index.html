@@ -12,7 +12,7 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <!-- CSS -->
-    <link rel="stylesheet" href="style.css">
+    <link id="app-style" rel="stylesheet" href="style.css">
 
     <!-- FIREBASE SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -29,7 +29,7 @@
         <div class="loader-content">
             <div class="pixel-spinner"></div>
             <h2 class="glitch" data-text="INITIALISATION...">INITIALISATION...</h2>
-            <p id="loading-status">Connexion au serveur sécurisé...</p>
+            <p id="loading-status">Noé rebranche le serveur...</p>
         </div>
     </div>
 
@@ -116,6 +116,27 @@
     <!-- 4. GAME UI                                -->
     <!-- ========================================= -->
     <div id="game-ui" class="hidden">
+        <div id="announcement-banner" class="hidden">
+            <div id="announcement-banner-inner">
+                <div id="announcement-banner-text">
+                    <div id="announcement-title"></div>
+                    <div id="announcement-content"></div>
+                </div>
+                <button id="btn-close-announcement" title="Fermer"><i class="ph ph-x"></i></button>
+            </div>
+        </div>
+
+        <div id="version-update-modal" class="modal-overlay hidden">
+            <div class="modal-card glass-panel" style="max-width: 420px; text-align: center;">
+                <h2 style="font-family: var(--font-pixel); font-size: 1.1rem; margin-bottom: 10px;">Nouvelle version disponible !</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem;">Une mise à jour du site est disponible. Cliquez pour recharger la page.</p>
+                <button id="btn-force-update" class="btn-primary" style="width: 100%;">
+                    <span class="btn-text">Mettre à jour</span>
+                    <i class="ph ph-arrow-clockwise"></i>
+                </button>
+            </div>
+        </div>
+
         <!-- HUD HAUT -->
         <div class="hud-top glass-panel">
             <div class="faction-score">
@@ -200,48 +221,148 @@
     <div id="admin-modal" class="modal-overlay hidden">
         <div class="modal-card glass-panel admin-card">
             <div class="modal-header">
-                <h2>GESTION WHITELIST</h2>
+                <h2>PANEL ADMIN</h2>
                 <button class="btn-close" id="btn-close-admin"><i class="ph ph-x"></i></button>
             </div>
             
-            <div class="admin-content">
-                <!-- Mode Sans Cooldown (Noeb uniquement) -->
-                <div class="admin-section" id="admin-no-cooldown-section">
-                    <h3>Mode Admin</h3>
-                    <div class="admin-toggle">
-                        <label for="toggle-admin-nocooldown">Désactiver le cooldown</label>
-                        <input type="checkbox" id="toggle-admin-nocooldown" class="toggle-switch">
-                    </div>
+            <div class="admin-layout">
+                <div class="admin-nav">
+                    <button class="admin-nav-item active" data-admin-tab="admin-tab-modes">Modes</button>
+                    <button class="admin-nav-item" data-admin-tab="admin-tab-whitelist">Whitelist</button>
+                    <button class="admin-nav-item" data-admin-tab="admin-tab-announcement">Annonce</button>
+                    <button class="admin-nav-item" data-admin-tab="admin-tab-version">Version</button>
+                    <button class="admin-nav-item" data-admin-tab="admin-tab-boosts">Boosts</button>
+                    <button class="admin-nav-item" data-admin-tab="admin-tab-bans">Bans</button>
                 </div>
 
-                <!-- Informations des cases -->
-                <div class="admin-section" id="admin-pixel-info-section">
-                    <h3>Affichage</h3>
-                    <div class="admin-toggle">
-                        <label for="toggle-pixel-info">Informations des cases</label>
-                        <input type="checkbox" id="toggle-pixel-info" class="toggle-switch">
-                    </div>
-                </div>
+                <div class="admin-main">
+                    <div class="admin-tab" id="admin-tab-modes">
+                        <!-- Mode Sans Cooldown (Noeb uniquement) -->
+                        <div class="admin-section" id="admin-no-cooldown-section">
+                            <h3>Mode Admin</h3>
+                            <div class="admin-toggle">
+                                <label for="toggle-admin-nocooldown">Désactiver le cooldown</label>
+                                <input type="checkbox" id="toggle-admin-nocooldown" class="toggle-switch">
+                            </div>
+                        </div>
 
-                <!-- Ajouter un élève -->
-                <div class="admin-section">
-                    <h3>Ajouter un élève</h3>
-                    <div class="add-user-form">
-                        <input type="text" id="admin-new-name" placeholder="Prénom (ex: Lucas)">
-                        <select id="admin-new-faction">
-                            <option value="1">TSTI1</option>
-                            <option value="2">TSTI2</option>
-                        </select>
-                        <button id="btn-admin-add" class="btn-small">Ajouter</button>
+                        <!-- Informations des cases -->
+                        <div class="admin-section" id="admin-pixel-info-section">
+                            <h3>Affichage</h3>
+                            <div class="admin-toggle">
+                                <label for="toggle-pixel-info">Informations des cases</label>
+                                <input type="checkbox" id="toggle-pixel-info" class="toggle-switch">
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Liste des élèves -->
-                <div class="admin-section">
-                    <h3>Liste autorisée</h3>
-                    <ul id="admin-user-list" class="user-list">
-                        <!-- Rempli par JS -->
-                    </ul>
+                    <div class="admin-tab hidden" id="admin-tab-whitelist">
+                        <!-- Ajouter un élève -->
+                        <div class="admin-section">
+                            <h3>Ajouter un élève</h3>
+                            <div class="add-user-form">
+                                <input type="text" id="admin-new-name" placeholder="Prénom (ex: Lucas)">
+                                <select id="admin-new-faction">
+                                    <option value="1">TSTI1</option>
+                                    <option value="2">TSTI2</option>
+                                </select>
+                                <button id="btn-admin-add" class="btn-small">Ajouter</button>
+                            </div>
+                        </div>
+
+                        <!-- Liste des élèves -->
+                        <div class="admin-section">
+                            <h3>Liste autorisée</h3>
+                            <ul id="admin-user-list" class="user-list">
+                                <!-- Rempli par JS -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab hidden" id="admin-tab-announcement">
+                        <!-- Annonce actuelle -->
+                        <div class="admin-section">
+                            <h3>Annonce actuelle</h3>
+                            <div id="admin-current-announcement" class="admin-announcement-preview">
+                                <p style="color: #888; font-style: italic;">Aucune annonce publiée</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Nouvelle annonce -->
+                        <div class="admin-section">
+                            <h3>Nouvelle annonce</h3>
+                            <div class="add-user-form" style="flex-direction: column; align-items: stretch;">
+                                <input type="text" id="admin-announcement-title" placeholder="Titre">
+                                <input type="text" id="admin-announcement-content" placeholder="Contenu">
+                                <div style="display: flex; gap: 10px;">
+                                    <button id="btn-admin-publish-announcement" class="btn-small" style="flex: 1;">Publier</button>
+                                    <button id="btn-admin-delete-announcement" class="btn-small" style="flex: 1; background: var(--error); color: white;">Supprimer</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab hidden" id="admin-tab-version">
+                        <!-- Version actuelle -->
+                        <div class="admin-section">
+                            <h3>Version actuelle</h3>
+                            <div id="admin-current-version" class="admin-version-display">
+                                <p style="color: #888; font-style: italic;">Chargement...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Nouvelle version -->
+                        <div class="admin-section">
+                            <h3>Nouvelle version</h3>
+                            <div class="add-user-form" style="align-items: center;">
+                                <input type="text" id="admin-site-version" placeholder="Ex: V1.2">
+                                <button id="btn-admin-save-version" class="btn-small">Sauvegarder</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab hidden" id="admin-tab-boosts">
+                        <div class="admin-section">
+                            <h3>Boosts</h3>
+                            <div class="add-user-form" style="flex-direction: column; align-items: stretch;">
+                                <select id="admin-boost-target">
+                                    <option value="all">Tous les joueurs</option>
+                                </select>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="number" id="admin-boost-duration-min" placeholder="Durée (min)" min="1">
+                                    <input type="number" id="admin-boost-cooldown-sec" placeholder="Cooldown (sec)" min="1">
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <button id="btn-admin-apply-boost" class="btn-small" style="flex: 1;">Activer</button>
+                                    <button id="btn-admin-remove-boost" class="btn-small" style="flex: 1; background: var(--error); color: white;">Supprimer</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab hidden" id="admin-tab-bans">
+                        <div class="admin-section">
+                            <h3>Bans temporaires</h3>
+                            <div class="add-user-form" style="flex-direction: column; align-items: stretch;">
+                                <select id="admin-ban-target">
+                                    <option value="">Choisir un joueur en ligne</option>
+                                </select>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="number" id="admin-ban-duration" placeholder="Durée" min="1">
+                                    <select id="admin-ban-unit">
+                                        <option value="minutes">Minutes</option>
+                                        <option value="hours">Heures</option>
+                                        <option value="days">Jours</option>
+                                        <option value="weeks">Semaines</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <button id="btn-admin-apply-ban" class="btn-small" style="flex: 1;">Bannir</button>
+                                    <button id="btn-admin-remove-ban" class="btn-small" style="flex: 1; background: var(--error); color: white;">Débannir</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -265,6 +386,33 @@
         const firestore = firebase.firestore();
     </script>
 
-    <script src="script.js"></script>
+    <script>
+        (function() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const v = params.get('v');
+                if (v) {
+                    const css = document.getElementById('app-style');
+                    if (css) css.href = `style.css?v=${encodeURIComponent(v)}`;
+                }
+            } catch (e) {}
+        })();
+    </script>
+
+    <script>
+        (function() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const v = params.get('v');
+                const s = document.createElement('script');
+                s.src = v ? `script.js?v=${encodeURIComponent(v)}` : 'script.js';
+                document.body.appendChild(s);
+            } catch (e) {
+                const s = document.createElement('script');
+                s.src = 'script.js';
+                document.body.appendChild(s);
+            }
+        })();
+    </script>
 </body>
 </html>

@@ -7,16 +7,34 @@ const CONFIG = {
     BOARD_SIZE: 150,
     PIXEL_SCALE: 20,
     COOLDOWN_MS: 60000,
+    CLIENT_VERSION: "V1.3",
     DOUBLE_CLICK_THRESHOLD: 300,
     ADMIN_USER: "noeb",
     
     PALETTE: [
-        '#6D001A', '#BE0039', '#FF4500', '#FFA800', '#FFD635', '#FFF8B8',
-        '#00A368', '#00CC78', '#7EED56', '#00756F', '#009EAA', '#00CCC0',
-        '#2450A4', '#3690EA', '#51E9F4', '#493AC1', '#6A5CFF', '#94B3FF',
-        '#811E9F', '#B44AC0', '#E4ABFF', '#DE107F', '#FF3881', '#FF99AA',
-        '#6D482F', '#9C6926', '#FFB470', '#000000', '#515252', '#898D90',
-        '#D4D7D9', '#FFFFFF'
+        // Rouges
+        '#8B0000', '#6D001A', '#BE0039', '#FF4500', '#FF6B35', '#FF8C42',
+        // Oranges
+        '#FFA800', '#FFB347', '#FFCC70', '#FFD635', '#FFEB3B', '#FFF8B8',
+        // Jaunes
+        '#FDD835', '#F9A825', '#F57F17', '#FFC107', '#FFEB3B', '#FFF59D',
+        // Verts
+        '#00A368', '#00CC78', '#7EED56', '#8BC34A', '#4CAF50', '#388E3C',
+        // Cyans
+        '#00756F', '#009EAA', '#00CCC0', '#00BCD4', '#00ACC1', '#0097A7',
+        // Bleus
+        '#2450A4', '#3690EA', '#51E9F4', '#42A5F5', '#2196F3', '#1976D2',
+        // Indigos
+        '#493AC1', '#6A5CFF', '#5E35B1', '#7E57C2', '#9575CD', '#B39DDB',
+        // Violets
+        '#811E9F', '#B44AC0', '#E4ABFF', '#9C27B0', '#AB47BC', '#BA68C8',
+        // Magentas/Roses
+        '#DE107F', '#FF3881', '#FF99AA', '#E91E63', '#F06292', '#F48FB1',
+        // Marrons
+        '#6D482F', '#9C6926', '#FFB470', '#8D6E63', '#A1887F', '#BCAAA4',
+        // Gris/Noirs/Blancs
+        '#000000', '#212121', '#424242', '#616161', '#757575', '#9E9E9E',
+        '#BDBDBD', '#E0E0E0', '#EEEEEE', '#F5F5F5', '#FAFAFA', '#FFFFFF'
     ],
     FACTIONS: {
         1: { name: 'TSTI1', color: '#00d2ff', cssClass: 'tsti1' },
@@ -56,6 +74,14 @@ const state = {
 
     onlineCountUpdateInterval: null,
 
+    lastPixelTs: 0,
+    cooldownMsEffective: 60000,
+    banExpiresAt: 0,
+
+    versionCheckInterval: null,
+    serverSiteVersion: null,
+    publicConfigLoaded: false,
+
     scoreUpdateTimer: null, renderLoopId: null
 };
 
@@ -70,12 +96,60 @@ function prettyName(name) {
 }
 
 /* ================= INIT & AUTH ================= */
-document.addEventListener('DOMContentLoaded', () => {
+let __bootstrapped = false;
+
+function bootstrapApp() {
+    if (__bootstrapped) return;
+    __bootstrapped = true;
+
     setupAuthUI();
     setupAdminListeners();
+    setupGlobalUiListeners();
+    setupAdminTabs();
     auth.onAuthStateChanged(handleAuthState);
     fetchWhitelist(); // Charge le cache initial
-});
+}
+
+function setupAdminTabs() {
+    const modal = document.getElementById('admin-modal');
+    if (!modal) return;
+
+    const navItems = [...modal.querySelectorAll('.admin-nav-item')];
+    const tabs = [...modal.querySelectorAll('.admin-tab')];
+    if (navItems.length === 0 || tabs.length === 0) return;
+
+    const openTab = (tabId) => {
+        tabs.forEach(t => {
+            if (t.id === tabId) t.classList.remove('hidden');
+            else t.classList.add('hidden');
+        });
+        navItems.forEach(b => {
+            if (b.dataset.adminTab === tabId) b.classList.add('active');
+            else b.classList.remove('active');
+        });
+    };
+
+    navItems.forEach(btn => {
+        if (btn.hasListener) return;
+        btn.addEventListener('click', () => {
+            const tabId = btn.dataset.adminTab;
+            if (!tabId) return;
+            openTab(tabId);
+        });
+        btn.hasListener = true;
+    });
+
+    const defaultTabId = navItems.find(b => b.classList.contains('active'))?.dataset.adminTab || navItems[0].dataset.adminTab;
+    if (defaultTabId) openTab(defaultTabId);
+}
+
+document.addEventListener('DOMContentLoaded', bootstrapApp);
+
+// Important: si script.js est chargé après DOMContentLoaded (cache busting / injection),
+// l'événement ne se déclenche plus. On bootstrap donc immédiatement si le DOM est prêt.
+if (document.readyState !== 'loading') {
+    bootstrapApp();
+}
 
 async function handleAuthState(user) {
     if (user) {
@@ -92,6 +166,8 @@ async function handleAuthState(user) {
             }
             
             updateUserInterface(); initGameEngine();
+            await loadPublicConfigOnce();
+            startVersionChecks();
             document.getElementById('loading-screen').classList.add('hidden');
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('register-modal').classList.add('hidden');
@@ -106,6 +182,23 @@ async function handleAuthState(user) {
         document.getElementById('game-ui').classList.add('hidden');
         document.getElementById('loading-screen').classList.add('hidden');
         document.getElementById('auth-screen').classList.remove('hidden');
+    }
+}
+
+function setupGlobalUiListeners() {
+    const closeBtn = document.getElementById('btn-close-announcement');
+    if (closeBtn && !closeBtn.hasListener) {
+        closeBtn.addEventListener('click', () => {
+            const banner = document.getElementById('announcement-banner');
+            if (banner) banner.classList.add('hidden');
+        });
+        closeBtn.hasListener = true;
+    }
+
+    const updateBtn = document.getElementById('btn-force-update');
+    if (updateBtn && !updateBtn.hasListener) {
+        updateBtn.addEventListener('click', () => forceReloadNoCache());
+        updateBtn.hasListener = true;
     }
 }
 
@@ -284,6 +377,65 @@ function setupAuthUI() {
     document.getElementById('login-username').addEventListener('input', handleLoginInput);
 }
 
+async function renderAdminCurrentVersion() {
+    const container = document.getElementById('admin-current-version');
+    const input = document.getElementById('admin-site-version');
+    if (!container || !input) return;
+    
+    try {
+        const doc = await firestore.collection('config').doc('public').get();
+        if (doc.exists) {
+            const data = doc.data();
+            const serverVersion = data.site_version || CONFIG.CLIENT_VERSION;
+            container.innerHTML = `
+                <div style="border-left: 4px solid var(--accent); padding-left: 12px;">
+                    <h4 style="margin: 0; color: var(--accent); font-size: 18px;">${serverVersion}</h4>
+                    <p style="margin: 4px 0 0 0; color: #888; font-size: 12px;">Version serveur</p>
+                </div>
+            `;
+            input.value = serverVersion;
+        } else {
+            container.innerHTML = `
+                <div style="border-left: 4px solid #888; padding-left: 12px;">
+                    <h4 style="margin: 0; color: #888; font-size: 18px;">${CONFIG.CLIENT_VERSION}</h4>
+                    <p style="margin: 4px 0 0 0; color: #888; font-size: 12px;">Version client (par défaut)</p>
+                </div>
+            `;
+            input.value = CONFIG.CLIENT_VERSION;
+        }
+    } catch (e) {
+        container.innerHTML = '<p style="color: #ff6b6b;">Erreur lors du chargement</p>';
+        input.value = CONFIG.CLIENT_VERSION;
+    }
+}
+
+async function renderAdminCurrentAnnouncement() {
+    const container = document.getElementById('admin-current-announcement');
+    if (!container) return;
+    
+    try {
+        const doc = await firestore.collection('config').doc('public').get();
+        if (doc.exists) {
+            const data = doc.data();
+            const announcement = data.announcement;
+            if (announcement && (announcement.title || announcement.content)) {
+                container.innerHTML = `
+                    <div style="border-left: 4px solid var(--primary); padding-left: 12px;">
+                        ${announcement.title ? `<h4 style="margin: 0 0 8px 0; color: var(--primary);">${announcement.title}</h4>` : ''}
+                        ${announcement.content ? `<p style="margin: 0; color: #ddd;">${announcement.content}</p>` : ''}
+                    </div>
+                `;
+            } else {
+                container.innerHTML = '<p style="color: #888; font-style: italic;">Aucune annonce publiée</p>';
+            }
+        } else {
+            container.innerHTML = '<p style="color: #888; font-style: italic;">Aucune annonce publiée</p>';
+        }
+    } catch (e) {
+        container.innerHTML = '<p style="color: #ff6b6b;">Erreur lors du chargement</p>';
+    }
+}
+
 async function fetchWhitelist() {
     try {
         const snap = await firestore.collection('whitelist').get();
@@ -313,13 +465,153 @@ function setupAdminListeners() {
             await fetchWhitelist();
         } catch (e) { showToast("Erreur ajout", "error"); }
     };
+
+    const publishBtn = document.getElementById('btn-admin-publish-announcement');
+    if (publishBtn && !publishBtn.hasListener) {
+        publishBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            const title = (document.getElementById('admin-announcement-title')?.value || '').trim();
+            const content = (document.getElementById('admin-announcement-content')?.value || '').trim();
+            if (!title && !content) return showToast("Annonce vide", "error");
+            try {
+                await firestore.collection('config').doc('public').set({
+                    announcement: {
+                        title: title,
+                        content: content,
+                        updated_at: firebase.firestore.FieldValue.serverTimestamp()
+                    }
+                }, { merge: true });
+                showToast("Annonce publiée", "success");
+            } catch (e) {
+                showToast("Erreur annonce", "error");
+            }
+        });
+        publishBtn.hasListener = true;
+    }
+
+    const deleteBtn = document.getElementById('btn-admin-delete-announcement');
+    if (deleteBtn && !deleteBtn.hasListener) {
+        deleteBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            try {
+                await firestore.collection('config').doc('public').set({
+                    announcement: null
+                }, { merge: true });
+                showToast("Annonce supprimée", "success");
+            } catch (e) {
+                showToast("Erreur annonce", "error");
+            }
+        });
+        deleteBtn.hasListener = true;
+    }
+
+    const saveVersionBtn = document.getElementById('btn-admin-save-version');
+    if (saveVersionBtn && !saveVersionBtn.hasListener) {
+        saveVersionBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            const v = (document.getElementById('admin-site-version')?.value || '').trim();
+            if (!/^V\d+(\.\d+)*$/i.test(v)) return showToast("Format invalide (ex: V1.2)", "error");
+            try {
+                await firestore.collection('config').doc('public').set({
+                    site_version: v
+                }, { merge: true });
+                showToast("Version sauvegardée", "success");
+            } catch (e) {
+                showToast("Erreur version", "error");
+            }
+        });
+        saveVersionBtn.hasListener = true;
+    }
+
+    const applyBoostBtn = document.getElementById('btn-admin-apply-boost');
+    if (applyBoostBtn && !applyBoostBtn.hasListener) {
+        applyBoostBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            const target = document.getElementById('admin-boost-target')?.value || 'all';
+            const durMin = parseInt(document.getElementById('admin-boost-duration-min')?.value || '0', 10);
+            const cdSec = parseInt(document.getElementById('admin-boost-cooldown-sec')?.value || '0', 10);
+            if (!durMin || durMin <= 0 || !cdSec || cdSec <= 0) return showToast("Valeurs invalides", "error");
+            const expiresAt = Date.now() + (durMin * 60 * 1000);
+            const cooldownMs = cdSec * 1000;
+            try {
+                if (target === 'all') {
+                    await db.ref('boosts/global').set({ cooldown_ms: cooldownMs, expires_at: expiresAt });
+                } else {
+                    await db.ref(`boosts/users/${target}`).set({ cooldown_ms: cooldownMs, expires_at: expiresAt });
+                }
+                showToast("Boost activé", "success");
+            } catch (e) {
+                showToast("Erreur boost", "error");
+            }
+        });
+        applyBoostBtn.hasListener = true;
+    }
+
+    const removeBoostBtn = document.getElementById('btn-admin-remove-boost');
+    if (removeBoostBtn && !removeBoostBtn.hasListener) {
+        removeBoostBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            const target = document.getElementById('admin-boost-target')?.value || 'all';
+            try {
+                if (target === 'all') {
+                    await db.ref('boosts/global').remove();
+                } else {
+                    await db.ref(`boosts/users/${target}`).remove();
+                }
+                showToast("Boost supprimé", "success");
+            } catch (e) {
+                showToast("Erreur boost", "error");
+            }
+        });
+        removeBoostBtn.hasListener = true;
+    }
+
+    const applyBanBtn = document.getElementById('btn-admin-apply-ban');
+    if (applyBanBtn && !applyBanBtn.hasListener) {
+        applyBanBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            const uid = document.getElementById('admin-ban-target')?.value || '';
+            if (!uid) return showToast("Choisis un joueur", "error");
+            const dur = parseInt(document.getElementById('admin-ban-duration')?.value || '0', 10);
+            const unit = document.getElementById('admin-ban-unit')?.value || 'minutes';
+            if (!dur || dur <= 0) return showToast("Durée invalide", "error");
+            const mult = unit === 'weeks' ? 7 * 24 * 60 * 60 * 1000 : unit === 'days' ? 24 * 60 * 60 * 1000 : unit === 'hours' ? 60 * 60 * 1000 : 60 * 1000;
+            const expiresAt = Date.now() + (dur * mult);
+            try {
+                await db.ref(`bans/${uid}`).set({ expires_at: expiresAt });
+                showToast("Joueur banni", "success");
+            } catch (e) {
+                showToast("Erreur ban", "error");
+            }
+        });
+        applyBanBtn.hasListener = true;
+    }
+
+    const removeBanBtn = document.getElementById('btn-admin-remove-ban');
+    if (removeBanBtn && !removeBanBtn.hasListener) {
+        removeBanBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            const uid = document.getElementById('admin-ban-target')?.value || '';
+            if (!uid) return showToast("Choisis un joueur", "error");
+            try {
+                await db.ref(`bans/${uid}`).remove();
+                showToast("Joueur débanni", "success");
+            } catch (e) {
+                showToast("Erreur ban", "error");
+            }
+        });
+        removeBanBtn.hasListener = true;
+    }
 }
 function openAdminPanel() {
     document.getElementById('admin-modal').classList.remove('hidden');
     // Afficher et initialiser la section admin no cooldown si c'est noeb
     if (state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER) {
-        const section = document.getElementById('admin-no-cooldown-section');
-        section.classList.add('shown');
+        const noCooldownSection = document.getElementById('admin-no-cooldown-section');
+        if (noCooldownSection) noCooldownSection.classList.add('shown');
+        
+        const pixelInfoSection = document.getElementById('admin-pixel-info-section');
+        if (pixelInfoSection) pixelInfoSection.classList.add('shown');
         
         // Initialiser le toggle (une seule fois)
         const toggleSwitch = document.getElementById('toggle-admin-nocooldown');
@@ -331,11 +623,15 @@ function openAdminPanel() {
             toggleSwitch.hasListener = true;
         }
         
-        // Initialiser le toggle "Informations des cases"
-        const pixelInfoSection = document.getElementById('admin-pixel-info-section');
-        pixelInfoSection.classList.add('shown');
+        // Afficher l'annonce actuelle
+        renderAdminCurrentAnnouncement();
+        
+        // Afficher la version actuelle
+        renderAdminCurrentVersion();
+        
+        // Initialiser le toggle pour les infos des cases (une seule fois)
         const pixelInfoToggle = document.getElementById('toggle-pixel-info');
-        if (!pixelInfoToggle.hasListener) {
+        if (pixelInfoToggle && !pixelInfoToggle.hasListener) {
             pixelInfoToggle.addEventListener('change', (e) => {
                 state.showPixelInfo = e.target.checked;
                 showToast(state.showPixelInfo ? "Infos des cases activées ✓" : "Infos des cases désactivées", "success");
@@ -344,6 +640,33 @@ function openAdminPanel() {
         }
     }
     renderAdminUserList();
+    renderAdminOnlineSelects();
+}
+
+function renderAdminOnlineSelects() {
+    const boostSelect = document.getElementById('admin-boost-target');
+    const banSelect = document.getElementById('admin-ban-target');
+    if (!boostSelect || !banSelect) return;
+
+    const currentBoost = boostSelect.value || 'all';
+    boostSelect.innerHTML = '<option value="all">Tous les joueurs</option>';
+    Object.entries(state.onlineUsers || {}).forEach(([uid, info]) => {
+        const opt = document.createElement('option');
+        opt.value = uid;
+        opt.textContent = info?.name ? info.name : uid;
+        boostSelect.appendChild(opt);
+    });
+    if ([...boostSelect.options].some(o => o.value === currentBoost)) boostSelect.value = currentBoost;
+
+    const currentBan = banSelect.value || '';
+    banSelect.innerHTML = '<option value="">Choisir un joueur en ligne</option>';
+    Object.entries(state.onlineUsers || {}).forEach(([uid, info]) => {
+        const opt = document.createElement('option');
+        opt.value = uid;
+        opt.textContent = info?.name ? info.name : uid;
+        banSelect.appendChild(opt);
+    });
+    if ([...banSelect.options].some(o => o.value === currentBan)) banSelect.value = currentBan;
 }
 function renderAdminUserList() {
     const ul = document.getElementById('admin-user-list'); ul.innerHTML = '';
@@ -430,9 +753,11 @@ function startRealtimeSync() {
                         loadedCount++;
                         
                         // Déclencher le fetch des noms d'utilisateurs
-                        if (state.userNamesCache && typeof state.userNamesCache === 'object') {
-                            if (!state.userNamesCache[pixelData.u]) {
-                                fetchUserName(pixelData.u);
+                        if (state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER && state.showPixelInfo) {
+                            if (state.userNamesCache && typeof state.userNamesCache === 'object') {
+                                if (!state.userNamesCache[pixelData.u]) {
+                                    fetchUserName(pixelData.u);
+                                }
                             }
                         }
                     } catch (pixelErr) {
@@ -456,14 +781,36 @@ function startRealtimeSync() {
     
     // Resynchronisation complète toutes les 5 secondes
     if (state.boardSyncInterval) clearInterval(state.boardSyncInterval);
-    state.boardSyncInterval = setInterval(loadBoardData, 5000);
+    state.boardSyncInterval = setInterval(loadBoardData, 120000);
     
     // Écouter SEULEMENT les CHANGEMENTS futurs, pas les données existantes
     db.ref('board').off('child_changed', handlePixelUpdate);
     db.ref('board').on('child_changed', handlePixelUpdate);
+
+    db.ref('board').orderByChild('t').startAt(Date.now() - 5000).off('child_added', handlePixelUpdate);
+    db.ref('board').orderByChild('t').startAt(Date.now() - 5000).on('child_added', handlePixelUpdate);
     
     db.ref(`users/${state.user.uid}/last_pixel`).on('value', snap => {
-        state.nextPixelTime = (snap.val() || 0) + CONFIG.COOLDOWN_MS; updateTimerDisplay();
+        state.lastPixelTs = (snap.val() || 0);
+        state.nextPixelTime = state.lastPixelTs + (state.cooldownMsEffective || CONFIG.COOLDOWN_MS);
+        updateTimerDisplay();
+    });
+
+    db.ref('boosts/global').on('value', snap => {
+        state.globalBoost = snap.val() || null;
+        recomputeEffectiveCooldown();
+    });
+
+    db.ref(`boosts/users/${state.user.uid}`).on('value', snap => {
+        state.userBoost = snap.val() || null;
+        recomputeEffectiveCooldown();
+    });
+
+    db.ref(`bans/${state.user.uid}`).on('value', snap => {
+        const ban = snap.val();
+        const expiresAt = ban && typeof ban.expires_at === 'number' ? ban.expires_at : 0;
+        state.banExpiresAt = expiresAt;
+        updateTimerDisplay();
     });
     
     // Initialiser la présence en ligne
@@ -472,7 +819,11 @@ function startRealtimeSync() {
             // Configurer le nettoyage automatique à la déconnexion
             db.ref(`status/${state.user.uid}`).onDisconnect().remove();
             // Ajouter la présence initiale avec timestamp
-            db.ref(`status/${state.user.uid}`).set(firebase.database.ServerValue.TIMESTAMP);
+            db.ref(`status/${state.user.uid}`).set({
+                t: firebase.database.ServerValue.TIMESTAMP,
+                n: state.userProfile?.username || 'Joueur',
+                f: state.userProfile?.faction || 0
+            });
         }
     });
     
@@ -480,7 +831,7 @@ function startRealtimeSync() {
     if (state.presenceHeartbeatInterval) clearInterval(state.presenceHeartbeatInterval);
     state.presenceHeartbeatInterval = setInterval(() => {
         if (state.user && db) {
-            db.ref(`status/${state.user.uid}`).set(firebase.database.ServerValue.TIMESTAMP)
+            db.ref(`status/${state.user.uid}`).update({ t: firebase.database.ServerValue.TIMESTAMP })
                 .catch(err => console.warn('Heartbeat failed:', err));
         }
     }, 30000);
@@ -495,16 +846,42 @@ function startRealtimeSync() {
         }
     };
     
-    updateOnlineCount();
     if (state.onlineCountUpdateInterval) clearInterval(state.onlineCountUpdateInterval);
-    state.onlineCountUpdateInterval = setInterval(updateOnlineCount, 5000);
-    
-    // Mettre à jour le scoreboard toutes les 5 secondes
-    updateOnlineUsersList();
-    if (state.scoreboardUpdateInterval) clearInterval(state.scoreboardUpdateInterval);
-    state.scoreboardUpdateInterval = setInterval(() => {
-        updateOnlineUsersList();
-    }, 5000);
+    state.onlineCountUpdateInterval = null;
+
+    db.ref('status').off('value', handleStatusValue);
+    db.ref('status').on('value', handleStatusValue);
+}
+
+function handleStatusValue(snap) {
+    try {
+        const data = snap.val() || {};
+        const uids = Object.keys(data);
+        const el = document.getElementById('online-count');
+        if (el) el.textContent = uids.length;
+
+        const newOnlineUsers = {};
+        uids.forEach(uid => {
+            const v = data[uid];
+            if (!v || typeof v !== 'object') return;
+            newOnlineUsers[uid] = {
+                name: v.n || 'Inconnu',
+                faction: v.f || 0
+            };
+        });
+
+        state.onlineUsers = newOnlineUsers;
+
+        if (state.showScoreboard) {
+            renderScoreboard();
+        }
+
+        if (!document.getElementById('admin-modal').classList.contains('hidden')) {
+            renderAdminOnlineSelects();
+        }
+    } catch (e) {
+        console.warn('Erreur handleStatusValue:', e);
+    }
 }
 function handlePixelUpdate(snap) {
     try {
@@ -533,9 +910,11 @@ function handlePixelUpdate(snap) {
         // Fetcher le nom de l'utilisateur si présent et pas encore en cache
         if (pixelData.u && typeof pixelData.u === 'string') {
             // Vérifier que userNamesCache existe
-            if (state.userNamesCache && typeof state.userNamesCache === 'object') {
-                if (!state.userNamesCache[pixelData.u]) {
-                    fetchUserName(pixelData.u);
+            if (state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER && state.showPixelInfo) {
+                if (state.userNamesCache && typeof state.userNamesCache === 'object') {
+                    if (!state.userNamesCache[pixelData.u]) {
+                        fetchUserName(pixelData.u);
+                    }
                 }
             }
         }
@@ -548,6 +927,7 @@ function handlePixelUpdate(snap) {
 async function fetchUserName(uid) {
     if (!uid || typeof uid !== 'string') return; // Validation stricte
     if (state.userNamesCache[uid]) return; // Déjà en cache
+    if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER || !state.showPixelInfo) return;
     
     // Mettre une valeur placeholder immédiatement pour déclencher le rendu
     state.userNamesCache[uid] = 'Chargement...';
@@ -572,83 +952,7 @@ async function fetchUserName(uid) {
 
 /* ================= SCOREBOARD ================= */
 async function updateOnlineUsersList() {
-    try {
-        // Récupérer la liste des utilisateurs en ligne depuis Realtime DB
-        const statusSnap = await db.ref('status').once('value');
-        const onlineUids = Object.keys(statusSnap.val() || {});
-        
-        if (onlineUids.length === 0) {
-            state.onlineUsers = {};
-            if (state.showScoreboard) {
-                renderScoreboard();
-            }
-            return;
-        }
-        
-        // Récupérer les infos de tous les utilisateurs en ligne depuis Firestore en parallèle
-        const userPromises = onlineUids.map(uid => 
-            firestore.collection('users').doc(uid).get()
-                .then(doc => {
-                    if (doc.exists) {
-                        const userData = doc.data();
-                        return {
-                            uid: uid,
-                            name: userData.username || 'Inconnu',
-                            faction: userData.faction || 0
-                        };
-                    }
-                    return null;
-                })
-                .catch(err => {
-                    console.warn(`Erreur fetch user ${uid}:`, err);
-                    return null;
-                })
-        );
-        
-        // Attendre que toutes les requêtes se terminent
-        const results = await Promise.all(userPromises);
-        
-        // Construire le nouvel objet d'utilisateurs en ligne (filtre les nulls)
-        const newOnlineUsers = {};
-        results.forEach(user => {
-            if (user) {
-                newOnlineUsers[user.uid] = {
-                    name: user.name,
-                    faction: user.faction
-                };
-            }
-        });
-        
-        // Comparer avec l'ancien état pour détecter les changements
-        const oldCount = Object.keys(state.onlineUsers).length;
-        const newCount = Object.keys(newOnlineUsers).length;
-        
-        let dataChanged = oldCount !== newCount;
-        
-        // Vérifier si les données des utilisateurs ont changé
-        if (!dataChanged) {
-            for (let uid in newOnlineUsers) {
-                if (!state.onlineUsers[uid] || 
-                    state.onlineUsers[uid].name !== newOnlineUsers[uid].name) {
-                    dataChanged = true;
-                    break;
-                }
-            }
-        }
-        
-        // Mettre à jour SEULEMENT si changement détecté
-        if (dataChanged) {
-            state.onlineUsers = newOnlineUsers;
-            console.log(`Scoreboard mis à jour: ${newCount} joueurs en ligne`);
-            
-            // Mettre à jour l'affichage du scoreboard si visible
-            if (state.showScoreboard) {
-                renderScoreboard();
-            }
-        }
-    } catch (err) {
-        console.warn('Erreur updateOnlineUsersList:', err);
-    }
+    if (state.showScoreboard) renderScoreboard();
 }
 
 function renderScoreboard() {
@@ -960,6 +1264,10 @@ function handleBoardClick(sx, sy, event) {
     const pos = screenToGrid(sx, sy);
     if(pos.x<0||pos.x>=CONFIG.BOARD_SIZE||pos.y<0||pos.y>=CONFIG.BOARD_SIZE) return;
     // Vérifier le cooldown sauf si c'est noeb en mode admin
+    if (!state.adminNoCooldown && state.banExpiresAt && Date.now() < state.banExpiresAt) {
+        return showToast(`Banni: ${formatRemaining(state.banExpiresAt - Date.now())}`, "error");
+    }
+
     if(!state.adminNoCooldown && Date.now() < state.nextPixelTime) return showToast("Attends le cooldown !", "error");
     
     const key = `${pos.x}_${pos.y}`;
@@ -977,7 +1285,7 @@ function handleBoardClick(sx, sy, event) {
     
     db.ref().update(updates).then(() => {
         showToast(`Pixel posé (${CONFIG.FACTIONS[fId].name})`, "success");
-        state.nextPixelTime = Date.now() + CONFIG.COOLDOWN_MS;
+        state.nextPixelTime = Date.now() + (state.cooldownMsEffective || CONFIG.COOLDOWN_MS);
     }).catch(() => showToast("Erreur serveur", "error"));
 }
 
@@ -1025,11 +1333,114 @@ function updateTimerDisplay() {
     const diff = state.nextPixelTime - Date.now();
     const box = document.getElementById('cooldown-container');
     const txt = document.getElementById('timer-text');
+
+    if (!state.adminNoCooldown && state.banExpiresAt && Date.now() < state.banExpiresAt) {
+        box.classList.remove('ready');
+        txt.textContent = `BANNI: ${formatRemaining(state.banExpiresAt - Date.now())}`;
+        return;
+    }
+
     if(diff<=0) {
         if(!box.classList.contains('ready')) { box.classList.add('ready'); txt.textContent="PRÊT !"; playSound('ready'); }
     } else {
         box.classList.remove('ready');
         txt.textContent = `${Math.floor(diff/60000)}:${Math.floor((diff%60000)/1000).toString().padStart(2,'0')}`;
+    }
+}
+
+function formatRemaining(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const w = Math.floor(s / (7 * 24 * 3600));
+    const d = Math.floor((s % (7 * 24 * 3600)) / (24 * 3600));
+    const h = Math.floor((s % (24 * 3600)) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+
+    if (w > 0) return `${w}sem ${d}j`;
+    if (d > 0) return `${d}j ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+}
+
+function recomputeEffectiveCooldown() {
+    const base = CONFIG.COOLDOWN_MS;
+    const now = Date.now();
+
+    let best = null;
+    if (state.globalBoost && typeof state.globalBoost === 'object') {
+        if (typeof state.globalBoost.expires_at === 'number' && state.globalBoost.expires_at > now && typeof state.globalBoost.cooldown_ms === 'number') {
+            best = state.globalBoost.cooldown_ms;
+        }
+    }
+
+    if (state.userBoost && typeof state.userBoost === 'object') {
+        if (typeof state.userBoost.expires_at === 'number' && state.userBoost.expires_at > now && typeof state.userBoost.cooldown_ms === 'number') {
+            best = state.userBoost.cooldown_ms;
+        }
+    }
+
+    state.cooldownMsEffective = best != null ? best : base;
+
+    if (state.lastPixelTs) {
+        state.nextPixelTime = state.lastPixelTs + state.cooldownMsEffective;
+    }
+
+    updateTimerDisplay();
+}
+
+async function loadPublicConfigOnce() {
+    if (state.publicConfigLoaded) return;
+    state.publicConfigLoaded = true;
+    try {
+        const doc = await firestore.collection('config').doc('public').get();
+        if (!doc.exists) return;
+        const data = doc.data() || {};
+        state.serverSiteVersion = data.site_version || null;
+
+        const announcement = data.announcement || null;
+        if (announcement && typeof announcement === 'object') {
+            const title = (announcement.title || '').toString();
+            const content = (announcement.content || '').toString();
+            if (title || content) {
+                const banner = document.getElementById('announcement-banner');
+                const titleEl = document.getElementById('announcement-title');
+                const contentEl = document.getElementById('announcement-content');
+                if (titleEl) titleEl.textContent = title;
+                if (contentEl) contentEl.textContent = content;
+                if (banner) banner.classList.remove('hidden');
+            }
+        }
+    } catch (e) {
+        console.warn('Public config unavailable');
+    }
+}
+
+function startVersionChecks() {
+    if (state.versionCheckInterval) clearInterval(state.versionCheckInterval);
+    state.versionCheckInterval = setInterval(async () => {
+        try {
+            const doc = await firestore.collection('config').doc('public').get();
+            if (!doc.exists) return;
+            const data = doc.data() || {};
+            const serverV = data.site_version || null;
+            if (!serverV) return;
+            if (serverV !== CONFIG.CLIENT_VERSION) {
+                const modal = document.getElementById('version-update-modal');
+                if (modal) modal.classList.remove('hidden');
+            }
+        } catch (e) {
+        }
+    }, 180000);
+}
+
+function forceReloadNoCache() {
+    try {
+        // Forcer un rechargement sans cache (équivalent Ctrl+F5)
+        window.location.reload(true);
+    } catch (e) {
+        // Fallback si reload(true) non supporté
+        const u = new URL(window.location.href);
+        u.searchParams.set('v', Date.now().toString());
+        window.location.replace(u.toString());
     }
 }
 function showToast(msg, type='info') {
