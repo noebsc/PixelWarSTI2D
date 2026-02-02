@@ -42,6 +42,9 @@ const state = {
     
     // Heartbeat de présence
     presenceHeartbeatInterval: null,
+    
+    // Resynchronisation périodique
+    boardSyncInterval: null,
 
     scoreUpdateTimer: null, renderLoopId: null
 };
@@ -381,51 +384,59 @@ function resizeCanvas() {
     const cvs = document.getElementById('gameCanvas'); cvs.width = window.innerWidth; cvs.height = window.innerHeight;
 }
 function startRealtimeSync() {
-    // Charger les pixels existants une seule fois au démarrage
-    db.ref('board').once('value', snap => {
-        try {
-            if (!snap || !snap.exists()) return;
-            
-            const boardData = snap.val();
-            if (!boardData || typeof boardData !== 'object' || Array.isArray(boardData)) return;
-            
-            let loadedCount = 0;
-            for (let key in boardData) {
-                if (!boardData.hasOwnProperty(key)) continue;
+    // Fonction pour charger/resynchroniser la carte complète
+    const loadBoardData = () => {
+        db.ref('board').once('value', snap => {
+            try {
+                if (!snap || !snap.exists()) return;
                 
-                try {
-                    const pixelData = boardData[key];
+                const boardData = snap.val();
+                if (!boardData || typeof boardData !== 'object' || Array.isArray(boardData)) return;
+                
+                let loadedCount = 0;
+                for (let key in boardData) {
+                    if (!boardData.hasOwnProperty(key)) continue;
                     
-                    // Vérification stricte: doit être un objet avec les bonnes propriétés
-                    if (!pixelData || typeof pixelData !== 'object' || Array.isArray(pixelData)) continue;
-                    if (!pixelData.c || !pixelData.f || !pixelData.u) continue;
-                    if (typeof pixelData.u !== 'string' || pixelData.u.length === 0) continue;
-                    if (typeof pixelData.f !== 'number' || (pixelData.f !== 1 && pixelData.f !== 2)) continue;
-                    
-                    // Si tout est OK, ajouter le pixel
-                    state.boardData[key] = pixelData;
-                    loadedCount++;
-                    
-                    // Déclencher le fetch des noms d'utilisateurs
-                    if (state.userNamesCache && typeof state.userNamesCache === 'object') {
-                        if (!state.userNamesCache[pixelData.u]) {
-                            fetchUserName(pixelData.u);
+                    try {
+                        const pixelData = boardData[key];
+                        
+                        // Vérification stricte: doit être un objet avec les bonnes propriétés
+                        if (!pixelData || typeof pixelData !== 'object' || Array.isArray(pixelData)) continue;
+                        if (!pixelData.c || !pixelData.f || !pixelData.u) continue;
+                        if (typeof pixelData.u !== 'string' || pixelData.u.length === 0) continue;
+                        if (typeof pixelData.f !== 'number' || (pixelData.f !== 1 && pixelData.f !== 2)) continue;
+                        
+                        // Si tout est OK, ajouter le pixel
+                        state.boardData[key] = pixelData;
+                        loadedCount++;
+                        
+                        // Déclencher le fetch des noms d'utilisateurs
+                        if (state.userNamesCache && typeof state.userNamesCache === 'object') {
+                            if (!state.userNamesCache[pixelData.u]) {
+                                fetchUserName(pixelData.u);
+                            }
                         }
+                    } catch (pixelErr) {
+                        console.warn(`Pixel invalide ${key}:`, pixelErr);
+                        continue;
                     }
-                } catch (pixelErr) {
-                    console.warn(`Pixel invalide ${key}:`, pixelErr);
-                    continue;
                 }
+                
+                console.log(`Board resynchronisé: ${loadedCount} pixels valides`);
+                calculateScores();
+            } catch (err) {
+                console.error('Erreur loading board:', err);
             }
-            
-            console.log(`Board chargé: ${loadedCount} pixels valides`);
-            calculateScores();
-        } catch (err) {
-            console.error('Erreur loading board:', err);
-        }
-    }).catch(err => {
-        console.error('Erreur lecture board:', err);
-    });
+        }).catch(err => {
+            console.error('Erreur lecture board:', err);
+        });
+    };
+    
+    // Charger les pixels existants au démarrage
+    loadBoardData();
+    
+    // Resynchronisation complète toutes les 5 secondes
+    state.boardSyncInterval = setInterval(loadBoardData, 5000);
     
     // Écouter SEULEMENT les CHANGEMENTS futurs, pas les données existantes
     db.ref('board').on('child_changed', handlePixelUpdate);
@@ -808,8 +819,9 @@ function setupPalette() {
     });
     document.getElementById('toggle-palette').onclick = () => document.getElementById('palette-container').classList.toggle('collapsed-mobile');
     document.getElementById('btn-logout').onclick = () => {
-        // Nettoyer le heartbeat et la présence avant déconnexion
+        // Nettoyer tous les intervals et la présence avant déconnexion
         if (state.presenceHeartbeatInterval) clearInterval(state.presenceHeartbeatInterval);
+        if (state.boardSyncInterval) clearInterval(state.boardSyncInterval);
         if (state.user) db.ref(`status/${state.user.uid}`).remove();
         auth.signOut().then(() => location.reload());
     };
