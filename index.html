@@ -170,6 +170,18 @@
             <div id="cooldown-container" class="glass-pill">
                 <div class="timer-icon"><i class="ph ph-clock"></i></div>
                 <span id="timer-text">--:--</span>
+                
+                <!-- Indicateurs de boost -->
+                <div id="boost-indicators" class="boost-indicators">
+                    <div id="boost-reduced" class="boost-indicator boost-reduced hidden">
+                        <i class="ph ph-bolt"></i>
+                        <span class="boost-text">BOOST ACTIF</span>
+                    </div>
+                    <div id="boost-increased" class="boost-indicator boost-increased hidden">
+                        <i class="ph ph-warning"></i>
+                        <span class="boost-text">COOLDOWN+</span>
+                    </div>
+                </div>
             </div>
             <div id="online-counter" class="glass-pill">
                 <div class="live-dot"></div>
@@ -191,6 +203,17 @@
         <!-- PALETTE -->
         <div id="palette-container" class="glass-panel collapsed-mobile">
             <button id="toggle-palette" class="mobile-only"><i class="ph ph-paint-brush"></i></button>
+            
+            <!-- Slider Pinceau/Pipette -->
+            <div id="tool-slider" class="tool-slider">
+                <div class="tool-option active" data-tool="brush">
+                    <i class="ph ph-paint-brush"></i>
+                </div>
+                <div class="tool-option" data-tool="pipette">
+                    <i class="ph ph-cursor"></i>
+                </div>
+            </div>
+            
             <div class="palette-grid" id="color-grid"></div>
         </div>
 

@@ -7,7 +7,7 @@ const CONFIG = {
     BOARD_SIZE: 150,
     PIXEL_SCALE: 20,
     COOLDOWN_MS: 60000,
-    CLIENT_VERSION: "V1.3",
+    CLIENT_VERSION: "V1.4",
     DOUBLE_CLICK_THRESHOLD: 300,
     ADMIN_USER: "noeb",
     
@@ -82,7 +82,10 @@ const state = {
     serverSiteVersion: null,
     publicConfigLoaded: false,
 
-    scoreUpdateTimer: null, renderLoopId: null
+    scoreUpdateTimer: null, renderLoopId: null,
+    
+    // Outil actif (pinceau ou pipette)
+    currentTool: 'brush'
 };
 
 /* ================= UTILITAIRES TEXTE ================= */
@@ -1263,6 +1266,44 @@ function handleBoardClick(sx, sy, event) {
     
     const pos = screenToGrid(sx, sy);
     if(pos.x<0||pos.x>=CONFIG.BOARD_SIZE||pos.y<0||pos.y>=CONFIG.BOARD_SIZE) return;
+    
+    // Mode pipette : récupérer la couleur du pixel
+    if (state.currentTool === 'pipette') {
+        const key = `${pos.x}_${pos.y}`;
+        const pixelData = state.boardData[key];
+        
+        if (pixelData && pixelData.c) {
+            // Récupérer la couleur
+            const color = pixelData.c;
+            state.selectedColor = color;
+            state.userColor = color;
+            
+            // Sauvegarder la couleur dans Firestore
+            firestore.collection('users').doc(state.user.uid).update({
+                selected_color: color
+            }).catch(err => console.warn('Erreur sauvegarde couleur:', err));
+            
+            // Mettre à jour l'UI de la palette
+            document.querySelectorAll('.color-swatch').forEach(swatch => {
+                swatch.classList.remove('active');
+                if (swatch.style.backgroundColor === color || 
+                    rgbToHex(swatch.style.backgroundColor) === color.toUpperCase()) {
+                    swatch.classList.add('active');
+                }
+            });
+            
+            // Repasser automatiquement en mode pinceau
+            switchTool('brush');
+            
+            showToast(`Couleur récupérée !`, "success");
+            playSound('pop');
+        } else {
+            showToast("Ce pixel n'a pas de couleur", "error");
+        }
+        return;
+    }
+    
+    // Mode pinceau normal
     // Vérifier le cooldown sauf si c'est noeb en mode admin
     if (!state.adminNoCooldown && state.banExpiresAt && Date.now() < state.banExpiresAt) {
         return showToast(`Banni: ${formatRemaining(state.banExpiresAt - Date.now())}`, "error");
@@ -1287,6 +1328,21 @@ function handleBoardClick(sx, sy, event) {
         showToast(`Pixel posé (${CONFIG.FACTIONS[fId].name})`, "success");
         state.nextPixelTime = Date.now() + (state.cooldownMsEffective || CONFIG.COOLDOWN_MS);
     }).catch(() => showToast("Erreur serveur", "error"));
+}
+
+// Utilitaire pour convertir RGB en Hex
+function rgbToHex(rgb) {
+    if (!rgb || rgb.indexOf('rgb') !== 0) return rgb;
+    
+    const values = rgb.match(/\d+/g);
+    if (!values || values.length < 3) return rgb;
+    
+    const hex = '#' + values.slice(0, 3).map(x => {
+        const hex = parseInt(x).toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+    }).join('');
+    
+    return hex.toUpperCase();
 }
 
 /* ================= UI HELPERS ================= */
@@ -1318,6 +1374,62 @@ function setupPalette() {
         };
         grid.appendChild(d);
     });
+    
+    // Initialiser le slider d'outils
+    setupToolSlider();
+}
+
+function setupToolSlider() {
+    const toolOptions = document.querySelectorAll('.tool-option');
+    
+    toolOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const tool = option.dataset.tool;
+            switchTool(tool);
+        });
+    });
+}
+
+function switchTool(tool) {
+    const toolOptions = document.querySelectorAll('.tool-option');
+    const canvasContainer = document.getElementById('canvas-container');
+    
+    // Mettre à jour l'état
+    state.currentTool = tool;
+    
+    // Mettre à jour l'UI
+    toolOptions.forEach(option => {
+        if (option.dataset.tool === tool) {
+            option.classList.add('active');
+        } else {
+            option.classList.remove('active');
+        }
+    });
+    
+    // Mettre à jour le curseur du canvas
+    if (tool === 'pipette') {
+        canvasContainer.classList.add('pipette-mode');
+    } else {
+        canvasContainer.classList.remove('pipette-mode');
+    }
+}
+
+function setupGlobalUiListeners() {
+    const closeBtn = document.getElementById('btn-close-announcement');
+    if (closeBtn && !closeBtn.hasListener) {
+        closeBtn.addEventListener('click', () => {
+            const banner = document.getElementById('announcement-banner');
+            if (banner) banner.classList.add('hidden');
+        });
+        closeBtn.hasListener = true;
+    }
+
+    const updateBtn = document.getElementById('btn-force-update');
+    if (updateBtn && !updateBtn.hasListener) {
+        updateBtn.addEventListener('click', () => forceReloadNoCache());
+        updateBtn.hasListener = true;
+    }
+    
     document.getElementById('toggle-palette').onclick = () => document.getElementById('palette-container').classList.toggle('collapsed-mobile');
     document.getElementById('btn-logout').onclick = () => {
         // Nettoyer tous les intervals et la présence avant déconnexion
@@ -1385,6 +1497,34 @@ function recomputeEffectiveCooldown() {
     }
 
     updateTimerDisplay();
+    updateBoostIndicators();
+}
+
+function updateBoostIndicators() {
+    const boostReduced = document.getElementById('boost-reduced');
+    const boostIncreased = document.getElementById('boost-increased');
+    
+    if (!boostReduced || !boostIncreased) return;
+    
+    const baseCooldown = CONFIG.COOLDOWN_MS;
+    const currentCooldown = state.cooldownMsEffective;
+    
+    // Réinitialiser les deux indicateurs
+    boostReduced.classList.add('hidden');
+    boostIncreased.classList.add('hidden');
+    
+    // Déterminer quel indicateur afficher
+    if (currentCooldown < baseCooldown) {
+        // Cooldown réduit (boost joyeux)
+        boostReduced.classList.remove('hidden');
+        boostReduced.querySelector('.boost-text').textContent = 
+            `BOOST ACTIF`;
+    } else if (currentCooldown > baseCooldown) {
+        // Cooldown augmenté (moins joyeux)
+        boostIncreased.classList.remove('hidden');
+        boostIncreased.querySelector('.boost-text').textContent = 
+            `COOLDOWN AUGMENTÉ`;
+    }
 }
 
 async function loadPublicConfigOnce() {
