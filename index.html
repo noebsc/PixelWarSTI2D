@@ -239,7 +239,29 @@
     </div>
 
     <!-- ========================================= -->
-    <!-- 5. ADMIN PANEL MODAL                      -->
+    <!-- 5. ADMIN CODE MODAL                      -->
+    <!-- ========================================= -->
+    <div id="admin-code-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel" style="max-width: 400px; text-align: center;">
+            <h2 style="font-family: var(--font-pixel); font-size: 1.2rem; margin-bottom: 15px; color: var(--color-tsti1);">CODE ADMIN</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem;">Entrez le code d'accès administrateur</p>
+            
+            <form id="admin-code-form">
+                <div class="input-group">
+                    <input type="password" id="admin-code-input" placeholder="Code admin" maxlength="4" autocomplete="off" required>
+                </div>
+                <div id="admin-code-error" class="error-msg hidden">Code incorrect</div>
+                
+                <button type="submit" id="btn-admin-code-submit" class="btn-primary" style="width: 100%; margin-bottom: 10px;">
+                    <span class="btn-text">Valider</span>
+                    <i class="ph ph-lock"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- 6. ADMIN PANEL MODAL                      -->
     <!-- ========================================= -->
     <div id="admin-modal" class="modal-overlay hidden">
         <div class="modal-card glass-panel admin-card">

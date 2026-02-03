@@ -7,34 +7,78 @@ const CONFIG = {
     BOARD_SIZE: 150,
     PIXEL_SCALE: 20,
     COOLDOWN_MS: 60000,
-    CLIENT_VERSION: "V1.4",
+    CLIENT_VERSION: "V1.5",
     DOUBLE_CLICK_THRESHOLD: 300,
     ADMIN_USER: "noeb",
     
     PALETTE: [
         // Rouges
         '#8B0000', '#6D001A', '#BE0039', '#FF4500', '#FF6B35', '#FF8C42',
+        '#DC143C', '#B22222', '#CD5C5C', '#F08080', '#FA8072', '#E9967A',
+        
         // Oranges
         '#FFA800', '#FFB347', '#FFCC70', '#FFD635', '#FFEB3B', '#FFF8B8',
+        '#FF8C00', '#FF7F50', '#FFA07A', '#FFB6C1', '#FFDAB9', '#FFE4B5',
+        
         // Jaunes
         '#FDD835', '#F9A825', '#F57F17', '#FFC107', '#FFEB3B', '#FFF59D',
+        '#DAA520', '#B8860B', '#FFD700', '#FFFF00', '#FFFFE0', '#FFFACD',
+        
         // Verts
         '#00A368', '#00CC78', '#7EED56', '#8BC34A', '#4CAF50', '#388E3C',
+        '#228B22', '#32CD32', '#90EE90', '#98FB98', '#00FF00', '#ADFF2F',
+        
         // Cyans
         '#00756F', '#009EAA', '#00CCC0', '#00BCD4', '#00ACC1', '#0097A7',
+        '#00CED1', '#48D1CC', '#40E0D0', '#00FFFF', '#E0FFFF', '#AFEEEE',
+        
         // Bleus
         '#2450A4', '#3690EA', '#51E9F4', '#42A5F5', '#2196F3', '#1976D2',
+        '#000080', '#0000CD', '#4169E1', '#1E90FF', '#00BFFF', '#87CEEB',
+        
         // Indigos
         '#493AC1', '#6A5CFF', '#5E35B1', '#7E57C2', '#9575CD', '#B39DDB',
+        '#4B0082', '#6A0DAD', '#8A2BE2', '#9370DB', '#9932CC', '#BA55D3',
+        
         // Violets
         '#811E9F', '#B44AC0', '#E4ABFF', '#9C27B0', '#AB47BC', '#BA68C8',
+        '#8B008B', '#FF00FF', '#EE82EE', '#DA70D6', '#DDA0DD', '#F0E68C',
+        
         // Magentas/Roses
         '#DE107F', '#FF3881', '#FF99AA', '#E91E63', '#F06292', '#F48FB1',
+        '#C71585', '#FF1493', '#FF69B4', '#FFB6C1', '#FFC0CB', '#FFE4E1',
+        
         // Marrons
         '#6D482F', '#9C6926', '#FFB470', '#8D6E63', '#A1887F', '#BCAAA4',
+        '#8B4513', '#A0522D', '#D2691E', '#DEB887', '#F4A460', '#D2B48C',
+        
         // Gris/Noirs/Blancs
         '#000000', '#212121', '#424242', '#616161', '#757575', '#9E9E9E',
-        '#BDBDBD', '#E0E0E0', '#EEEEEE', '#F5F5F5', '#FAFAFA', '#FFFFFF'
+        '#BDBDBD', '#E0E0E0', '#EEEEEE', '#F5F5F5', '#FAFAFA', '#FFFFFF',
+        
+        // Nouvelles teintes - Rouges foncés et clairs
+        '#8B0000', '#A52A2A', '#B22222', '#CD5C5C', '#F08080', '#FFA07A',
+        
+        // Nouvelles teintes - Oranges et cuivres
+        '#FF8C00', '#FF7F50', '#FF6347', '#FFA500', '#FFB347', '#FFD700',
+        
+        // Nouvelles teintes - Verts d'eau et forêts
+        '#2E8B57', '#3CB371', '#66CDAA', '#8FBC8F', '#20B2AA', '#008B8B',
+        
+        // Nouvelles teintes - Bleus marines et ciel
+        '#191970', '#000080', '#4169E1', '#6495ED', '#87CEFA', '#B0E0E6',
+        
+        // Nouvelles teintes - Pourpres et lavandes
+        '#8B008B', '#9400D3', '#8A2BE2', '#9370DB', '#DDA0DD', '#E6E6FA',
+        
+        // Nouvelles teintes - Roses pâles et corails
+        '#FF69B4', '#FFB6C1', '#FFC0CB', '#FFE4E1', '#FFF0F5', '#F0FFFF',
+        
+        // Nouvelles teintes - Gris métalliques et argentés
+        '#708090', '#778899', '#B0C4DE', '#D3D3D3', '#DCDCDC', '#F5F5F5',
+        
+        // Nouvelles teintes - Terres et ocres
+        '#8B7355', '#A0826D', '#BC9A6A', '#CDAF7D', '#DEB887', '#F5DEB3'
     ],
     FACTIONS: {
         1: { name: 'TSTI1', color: '#00d2ff', cssClass: 'tsti1' },
@@ -607,6 +651,26 @@ function setupAdminListeners() {
     }
 }
 function openAdminPanel() {
+    // Vérifier si c'est bien l'admin
+    if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) {
+        showToast("Accès refusé", "error");
+        return;
+    }
+    
+    // Afficher la modale de code au lieu du panel directement
+    const modal = document.getElementById('admin-code-modal');
+    const input = document.getElementById('admin-code-input');
+    
+    modal.classList.remove('hidden');
+    input.value = '';
+    input.focus();
+    
+    // Masquer l'erreur au cas où
+    document.getElementById('admin-code-error').classList.add('hidden');
+}
+
+// Nouvelle fonction pour ouvrir le panel admin après vérification
+function openAdminPanelAfterCode() {
     document.getElementById('admin-modal').classList.remove('hidden');
     // Afficher et initialiser la section admin no cooldown si c'est noeb
     if (state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER) {
@@ -1440,6 +1504,91 @@ function setupGlobalUiListeners() {
         if (state.user) db.ref(`status/${state.user.uid}`).remove();
         auth.signOut().then(() => location.reload());
     };
+    
+    // Setup modale de code admin
+    setupAdminCodeModal();
+}
+
+function setupAdminCodeModal() {
+    const form = document.getElementById('admin-code-form');
+    const input = document.getElementById('admin-code-input');
+    const errorDiv = document.getElementById('admin-code-error');
+    
+    if (!form || !input) return;
+    
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const enteredCode = input.value.trim();
+        const isValid = verifyAdminCode(enteredCode);
+        
+        if (isValid) {
+            // Fermer la modale de code
+            document.getElementById('admin-code-modal').classList.add('hidden');
+            input.value = '';
+            errorDiv.classList.add('hidden');
+            
+            // Ouvrir le panel admin après vérification
+            openAdminPanelAfterCode();
+        } else {
+            // Afficher erreur
+            errorDiv.classList.remove('hidden');
+            input.value = '';
+            input.focus();
+            
+            // Animation de secousse
+            input.style.animation = 'shake 0.5s';
+            setTimeout(() => {
+                input.style.animation = '';
+            }, 500);
+        }
+    });
+    
+    // Fermer la modale avec Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('admin-code-modal');
+            if (!modal.classList.contains('hidden')) {
+                modal.classList.add('hidden');
+                input.value = '';
+                errorDiv.classList.add('hidden');
+            }
+        }
+    });
+}
+
+function verifyAdminCode(enteredCode) {
+    // Code correct stocké : 0304
+    const correctCode = '0304';
+    
+    // Vérifier que le code saisi fait 4 caractères
+    if (!enteredCode || enteredCode.length !== 4) {
+        return false;
+    }
+    
+    // Transformer le code saisi selon la logique :
+    // - Augmenter le 2ème caractère (index 1) de 1
+    // - Augmenter le 4ème caractère (index 3) de 1
+    let transformedCode = '';
+    for (let i = 0; i < enteredCode.length; i++) {
+        const char = enteredCode[i];
+        const digit = parseInt(char);
+        
+        if (i === 1 || i === 3) {
+            // 2ème et 4ème caractère : augmenter de 1 si c'est un nombre
+            if (!isNaN(digit) && digit >= 0 && digit <= 8) {
+                transformedCode += (digit + 1).toString();
+            } else {
+                transformedCode += char; // Garder le caractère si ce n'est pas un nombre valide
+            }
+        } else {
+            // Autres caractères : inchangés
+            transformedCode += char;
+        }
+    }
+    
+    // Vérifier si le code transformé correspond au code correct
+    return transformedCode === correctCode;
 }
 function updateTimerDisplay() {
     const diff = state.nextPixelTime - Date.now();
