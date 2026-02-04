@@ -1,84 +1,94 @@
 /* ==========================================================================
-   PIXEL WAR STI2D - ULTIMATE EDITION
-   Version: 3.1 (Hover Highlight & Dynamic Search)
+   PIXEL WAR STI2D 
    ========================================================================== */
+
+// Variables Firebase
+let auth, db, firestore;
+
+// Initialiser Firebase depuis window
+function initFirebase() {
+    auth = window.auth;
+    db = window.db;
+    firestore = window.firestore;
+}
+
+// Initialiser Firebase immédiatement
+initFirebase();
+
+// Fonction pour mettre à jour le message de chargement
+function updateLoadingProgress(message, progress) {
+    const statusElement = document.getElementById('loading-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+    }
+}
 
 const CONFIG = {
     BOARD_SIZE: 150,
     PIXEL_SCALE: 20,
-    COOLDOWN_MS: 60000,
-    CLIENT_VERSION: "V1.5",
+    COOLDOWN_MS: 60000, // Cooldown pour placer les pixels (60 secondes)
+    CHAT_COOLDOWN_MS: 10000, // Cooldown pour le chat (10 secondes)
+    CLIENT_VERSION: "V1.6",
     DOUBLE_CLICK_THRESHOLD: 300,
     ADMIN_USER: "noeb",
     
+    // Temps d'inactivité (en millisecondes)
+    INACTIVITY_TAB_TIMEOUT: 30000, // 30 secondes pour onglet inactif/changement d'onglet
+    INACTIVITY_MOUSE_TIMEOUT: 300000, // 5 minutes (300 secondes) pour souris inactive
+    
     PALETTE: [
-        // Rouges
-        '#8B0000', '#6D001A', '#BE0039', '#FF4500', '#FF6B35', '#FF8C42',
-        '#DC143C', '#B22222', '#CD5C5C', '#F08080', '#FA8072', '#E9967A',
+        // Triées par ordre HSL parfait (0-360°)
+        '#000000', '#212121', '#424242', '#616161', '#757575', '#9E9E9E',
+        '#BDBDBD', '#D3D3D3', '#DCDCDC', '#E0E0E0', '#EEEEEE', '#F5F5F5',
+        '#FAFAFA', '#FFFFFF', '#708090', '#778899', '#B0C4DE',
         
-        // Oranges
-        '#FFA800', '#FFB347', '#FFCC70', '#FFD635', '#FFEB3B', '#FFF8B8',
-        '#FF8C00', '#FF7F50', '#FFA07A', '#FFB6C1', '#FFDAB9', '#FFE4B5',
+        // Rouges (0-20°)
+        '#8B0000', '#6D001A', '#BE0039', '#DC143C', '#B22222', '#CD5C5C',
+        '#A52A2A', '#FF4757', '#FF6B6B', '#FF8C42', '#FF6B35', '#FF8C00',
         
-        // Jaunes
-        '#FDD835', '#F9A825', '#F57F17', '#FFC107', '#FFEB3B', '#FFF59D',
-        '#DAA520', '#B8860B', '#FFD700', '#FFFF00', '#FFFFE0', '#FFFACD',
+        // Oranges (20-40°)
+        '#FF7F50', '#FF6347', '#FFA800', '#FFB347', '#FFCC70', '#FFD635',
+        '#FFA500', '#FFB6C1', '#FFA07A', '#FFDAB9', '#FFE4B5',
         
-        // Verts
+        // Jaunes (40-60°)
+        '#FDD835', '#F9A825', '#F57F17', '#DAA520', '#B8860B', '#FFC107',
+        '#FFEB3B', '#FFF59D', '#FFFF00', '#FFFFE0', '#FFFACD', '#FFD700',
+        
+        // Verts (60-120°)
         '#00A368', '#00CC78', '#7EED56', '#8BC34A', '#4CAF50', '#388E3C',
         '#228B22', '#32CD32', '#90EE90', '#98FB98', '#00FF00', '#ADFF2F',
+        '#2E8B57', '#3CB371', '#66CDAA', '#8FBC8F', '#20B2AA', '#008B8B',
+        '#05ffa1',
         
-        // Cyans
+        // Cyans (120-180°)
         '#00756F', '#009EAA', '#00CCC0', '#00BCD4', '#00ACC1', '#0097A7',
         '#00CED1', '#48D1CC', '#40E0D0', '#00FFFF', '#E0FFFF', '#AFEEEE',
         
-        // Bleus
+        // Bleus (180-240°)
         '#2450A4', '#3690EA', '#51E9F4', '#42A5F5', '#2196F3', '#1976D2',
         '#000080', '#0000CD', '#4169E1', '#1E90FF', '#00BFFF', '#87CEEB',
+        '#191970', '#6495ED', '#87CEFA', '#B0E0E6',
         
-        // Indigos
+        // Indigos (240-270°)
         '#493AC1', '#6A5CFF', '#5E35B1', '#7E57C2', '#9575CD', '#B39DDB',
         '#4B0082', '#6A0DAD', '#8A2BE2', '#9370DB', '#9932CC', '#BA55D3',
         
-        // Violets
+        // Violets (270-300°)
         '#811E9F', '#B44AC0', '#E4ABFF', '#9C27B0', '#AB47BC', '#BA68C8',
-        '#8B008B', '#FF00FF', '#EE82EE', '#DA70D6', '#DDA0DD', '#F0E68C',
+        '#8B008B', '#9400D3', '#FF00FF', '#EE82EE', '#DA70D6', '#DDA0DD',
+        '#E6E6FA',
         
-        // Magentas/Roses
-        '#DE107F', '#FF3881', '#FF99AA', '#E91E63', '#F06292', '#F48FB1',
-        '#C71585', '#FF1493', '#FF69B4', '#FFB6C1', '#FFC0CB', '#FFE4E1',
+        // Magentas/Roses (300-340°)
+        '#DE107F', '#FF3881', '#FF99AA', '#F06292', '#F48FB1', '#FF69B4',
+        '#FFC0CB', '#FFE4E1', '#FFF0F5', '#F0FFFF',
         
-        // Marrons
-        '#6D482F', '#9C6926', '#FFB470', '#8D6E63', '#A1887F', '#BCAAA4',
-        '#8B4513', '#A0522D', '#D2691E', '#DEB887', '#F4A460', '#D2B48C',
+        // Marrons et Terres (neutres chauds)
+        '#6D482F', '#9C6926', '#8B4513', '#A0522D', '#D2691E', '#8D6E63',
+        '#A1887F', '#BCAAA4', '#DEB887', '#F4A460', '#D2B48C', '#8B7355',
+        '#A0826D', '#BC9A6A', '#CDAF7D', '#F5DEB3', '#FFB470',
         
-        // Gris/Noirs/Blancs
-        '#000000', '#212121', '#424242', '#616161', '#757575', '#9E9E9E',
-        '#BDBDBD', '#E0E0E0', '#EEEEEE', '#F5F5F5', '#FAFAFA', '#FFFFFF',
-        
-        // Nouvelles teintes - Rouges foncés et clairs
-        '#8B0000', '#A52A2A', '#B22222', '#CD5C5C', '#F08080', '#FFA07A',
-        
-        // Nouvelles teintes - Oranges et cuivres
-        '#FF8C00', '#FF7F50', '#FF6347', '#FFA500', '#FFB347', '#FFD700',
-        
-        // Nouvelles teintes - Verts d'eau et forêts
-        '#2E8B57', '#3CB371', '#66CDAA', '#8FBC8F', '#20B2AA', '#008B8B',
-        
-        // Nouvelles teintes - Bleus marines et ciel
-        '#191970', '#000080', '#4169E1', '#6495ED', '#87CEFA', '#B0E0E6',
-        
-        // Nouvelles teintes - Pourpres et lavandes
-        '#8B008B', '#9400D3', '#8A2BE2', '#9370DB', '#DDA0DD', '#E6E6FA',
-        
-        // Nouvelles teintes - Roses pâles et corails
-        '#FF69B4', '#FFB6C1', '#FFC0CB', '#FFE4E1', '#FFF0F5', '#F0FFFF',
-        
-        // Nouvelles teintes - Gris métalliques et argentés
-        '#708090', '#778899', '#B0C4DE', '#D3D3D3', '#DCDCDC', '#F5F5F5',
-        
-        // Nouvelles teintes - Terres et ocres
-        '#8B7355', '#A0826D', '#BC9A6A', '#CDAF7D', '#DEB887', '#F5DEB3'
+        // Pâles et pastels
+        '#F08080', '#FA8072', '#E9967A', '#FFDAB9', '#FFE4B5', '#F8BBD0'
     ],
     FACTIONS: {
         1: { name: 'TSTI1', color: '#00d2ff', cssClass: 'tsti1' },
@@ -102,6 +112,39 @@ const state = {
     showPixelInfo: false,
     userNamesCache: {}, // Cache des noms d'utilisateurs {uid: username}
     
+    // États pour les boosts et bans
+    globalBoost: null,
+    userBoosts: {},
+    activeBans: {},
+    
+    // Image overlay
+    imageOverlay: {
+        img: null,
+        x: 0,
+        y: 0,
+        scale: 1,
+        opacity: 1,
+        visible: false
+    },
+    
+    // Timers et intervals
+    renderLoopId: null,
+    boardSyncInterval: null,
+    onlineCountUpdateInterval: null,
+    presenceHeartbeatInterval: null,
+    
+    // Cooldown effectif
+    cooldownMsEffective: CONFIG.COOLDOWN_MS,
+    lastPixelTs: 0,
+    banExpiresAt: 0,
+    
+    // Utilisateurs en ligne
+    onlineUsers: {}, // {uid: {name, faction}}
+    showScoreboard: false,
+    scoreboardUpdateInterval: null,
+
+    onlineCountUpdateInterval: null,
+
     // Heartbeat de présence
     presenceHeartbeatInterval: null,
     
@@ -111,10 +154,75 @@ const state = {
     // Couleur persistante
     userColor: null,
     
-    // Scoreboard (utilisateurs en ligne)
-    onlineUsers: {}, // {uid: {name, faction}}
-    showScoreboard: false,
-    scoreboardUpdateInterval: null,
+    // Chat system
+    chatMessages: [],
+    chatCooldown: 0,
+    chatMutedUntil: 0,
+    chatBannedUntil: 0,
+    chatInfractions: 0,
+    
+    // Inactivity system
+    isInactive: false,
+    inactivityTimer: null,
+    lastActivity: Date.now(),
+    renderLoopPaused: false,
+    
+    // Firebase references for pause/resume
+    boardRef: null,
+    statusRef: null,
+    chatMessagesRef: null,
+    chatPunishmentsRef: null,
+    lastMessageTimes: [],
+    chatMessageCount: 0,
+    chatWindowOpen: false,
+    lastReadCount: 0,
+    
+    // Chat punishment update timer (optimisé pour économiser les requêtes)
+    chatPunishmentUpdateTimer: null,
+    lastChatPunishmentUpdate: 0,
+    
+    // Local cooldown counter (pas de requêtes Firebase)
+    chatCooldownInterval: null,
+    
+    // Punishment banner refresh timer
+    punishmentBannerInterval: null,
+    
+    // Chat punishments
+    activeChatPunishments: {}, // {uid: {type: 'mute'/'ban_chat', expires_at: timestamp}}
+    
+    // Bad words list
+    badWords: [
+        'con', 'connard', 'connasse', 'salope', 'putain', 'merde', 'bite', 'cul', 'chatte',
+        'enculé', 'enculer', 'fils de pute', 'fdp', 'ntm', 'ta mère', 'tg', 'batard',
+        'trou du cul', 'salaud', 'enculé', 'pute', 'bougnoul', 'negre', 'race'
+    ],
+
+    // Chat punishment configuration
+    chatPunishmentRules: {
+        // Seuils d'infractions pour chaque niveau
+        thresholds: {
+            warning: 1,      // 1ère infraction = warning
+            mute5min: 2,     // 2ème infraction = mute 5min
+            mute20min: 3,    // 3ème infraction = mute 20min
+            mute1day: 4,     // 4ème infraction = mute 1 jour
+            mute1week: 5,    // 5ème infraction = mute 1 semaine
+            ban1day: 6,      // 6ème infraction = ban jeu 1 jour
+            ban1week: 7,     // 7ème infraction = ban jeu 1 semaine
+            banDef: 8        // 8ème infraction = ban définitif
+        },
+        // Durées en millisecondes
+        durations: {
+            warning: 0,           // Warning = pas de mute
+            mute5min: 5 * 60 * 1000,      // 5 minutes
+            mute20min: 20 * 60 * 1000,    // 20 minutes
+            mute1day: 24 * 60 * 60 * 1000, // 1 jour
+            mute1week: 7 * 24 * 60 * 60 * 1000, // 1 semaine
+            muteDef: 0,            // Mute définitif
+            ban1day: 24 * 60 * 60 * 1000,   // 1 jour
+            ban1week: 7 * 24 * 60 * 60 * 1000, // 1 semaine
+            banDef: 0               // Ban définitif
+        }
+    },
 
     onlineCountUpdateInterval: null,
 
@@ -129,10 +237,1006 @@ const state = {
     scoreUpdateTimer: null, renderLoopId: null,
     
     // Outil actif (pinceau ou pipette)
-    currentTool: 'brush'
+    currentTool: 'brush',
+    
+    // Import image overlay
+    imageOverlay: {
+        img: null,
+        opacity: 0.5,
+        scale: 1.0,
+        x: 0,
+        y: 0,
+        visible: false
+    }
 };
 
-/* ================= UTILITAIRES TEXTE ================= */
+/* ================= CHAT SYSTEM ================= */
+function setupChatSystem() {
+    const chatToggleBtn = document.getElementById('chat-toggle-btn');
+    const chatWindow = document.getElementById('chat-window');
+    const chatCloseBtn = document.getElementById('chat-close-btn');
+    const chatInput = document.getElementById('chat-input');
+    const chatSendBtn = document.getElementById('chat-send-btn');
+    
+    if (!chatToggleBtn || !chatWindow || !chatCloseBtn || !chatInput || !chatSendBtn) return;
+    
+    // Toggle chat window
+    chatToggleBtn.addEventListener('click', () => {
+        state.chatWindowOpen = !state.chatWindowOpen;
+        if (state.chatWindowOpen) {
+            chatWindow.classList.add('show');
+            chatWindow.classList.remove('hidden');
+            chatInput.focus();
+            loadChatMessages();
+            hideChatNotification(); // Hide notification when opening
+        } else {
+            chatWindow.classList.remove('show');
+            setTimeout(() => chatWindow.classList.add('hidden'), 400);
+        }
+    });
+    
+    // Close chat window
+    chatCloseBtn.addEventListener('click', () => {
+        state.chatWindowOpen = false;
+        chatWindow.classList.remove('show');
+        setTimeout(() => chatWindow.classList.add('hidden'), 400);
+    });
+    
+    // Send message
+    chatSendBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendChatMessage();
+        }
+    });
+    
+    // Listen for chat punishments
+    if (state.chatPunishmentsRef) {
+        state.chatPunishmentsRef.off('value');
+    }
+    state.chatPunishmentsRef = db.ref('chat_punishments');
+    state.chatPunishmentsRef.on('value', (snapshot) => {
+        state.activeChatPunishments = snapshot.val() || {};
+        updateChatUI();
+    });
+    
+    // Listen for user's own punishments
+    if (state.user) {
+        db.ref(`chat_punishments/${state.user.uid}`).on('value', (snapshot) => {
+            const punishment = snapshot.val();
+            if (punishment && punishment.expires_at > Date.now()) {
+                if (punishment.type === 'mute') {
+                    state.chatMutedUntil = punishment.expires_at;
+                } else if (punishment.type === 'ban_chat') {
+                    state.chatBannedUntil = punishment.expires_at;
+                }
+                // Ne pas appeler updateChatUI() ici, il sera appelé par le listener ci-dessus
+            } else if (!punishment) {
+                // Si la punishment est supprimée ou expirée
+                state.chatMutedUntil = 0;
+                state.chatBannedUntil = 0;
+            }
+            updateChatUI();
+        });
+    }
+    
+    // Initial update for existing punishments
+    updateChatUI();
+    
+    // Protection contre le rechargement : enclencher un cooldown automatique (sauf admin)
+    const isAdmin = state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER;
+    if (!isAdmin) {
+        state.chatCooldown = Date.now() + CONFIG.CHAT_COOLDOWN_MS; // 10 secondes de cooldown au chargement
+        startLocalCooldownCounter(); // Démarrer le compteur local
+    }
+}
+
+// Load chat messages
+async function loadChatMessages() {
+    const messagesContainer = document.getElementById('chat-messages');
+    if (!messagesContainer) return;
+    
+    // Check if user is punished before loading messages
+    const now = Date.now();
+    if (state.chatBannedUntil > now || state.chatMutedUntil > now) {
+        // Show access denied message immediately
+        const punishmentType = state.chatBannedUntil > now ? 'ban' : 'mute';
+        const expiresAt = punishmentType === 'ban' ? state.chatBannedUntil : state.chatMutedUntil;
+        const remaining = Math.ceil((expiresAt - now) / (1000 * 60));
+        
+        // Get punishment details from active punishments
+        const userPunishment = state.activeChatPunishments?.[state.user?.uid];
+        const reason = userPunishment?.reason || 'Non spécifié';
+        const infractions = userPunishment?.infractions || 0;
+        
+        messagesContainer.innerHTML = `
+            <div class="chat-punishment-banner ${punishmentType}">
+                <div class="punishment-icon">${punishmentType === 'ban' ? '🚫' : '🔇'}</div>
+                <div class="punishment-title">${punishmentType === 'ban' ? 'Banni du chat' : 'Muet du chat'}</div>
+                <div class="punishment-reason">Raison: ${reason}</div>
+                <div class="punishment-duration">Temps restant: ${remaining} minute${remaining > 1 ? 's' : ''}</div>
+                <div class="punishment-details">Infractions: ${infractions}</div>
+                <div class="punishment-expires">Expire: ${new Date(expiresAt).toLocaleString('fr-FR')}</div>
+            </div>
+        `;
+        
+        // Add gray overlay to chat
+        messagesContainer.classList.add('chat-punished');
+        
+        // Démarrer le timer d'actualisation de la bannière
+        startPunishmentBannerRefresh();
+        return;
+    }
+    
+    // Remove gray overlay if not punished
+    messagesContainer.classList.remove('chat-punished');
+    
+    // Arrêter le timer d'actualisation si plus puni
+    stopPunishmentBannerRefresh();
+    
+    const messagesRef = db.ref('chat').orderByChild('timestamp').limitToLast(100);
+    
+    // Stocker la référence pour pouvoir la mettre en pause
+    if (state.chatMessagesRef) {
+        state.chatMessagesRef.off('value');
+    }
+    state.chatMessagesRef = messagesRef;
+    
+    messagesRef.on('value', (snapshot) => {
+        // Double-check punishment status in real-time
+        const currentNow = Date.now();
+        if (state.chatBannedUntil > currentNow || state.chatMutedUntil > currentNow) {
+            // Stop listening if user became punished
+            messagesRef.off('value');
+            renderChatMessages(); // Will show punishment banner
+            return;
+        }
+        
+        state.chatMessages = [];
+        snapshot.forEach((childSnapshot) => {
+            state.chatMessages.push({
+                id: childSnapshot.key,
+                ...childSnapshot.val()
+            });
+        });
+        
+        // Check for new messages while chat was closed
+        if (!state.chatWindowOpen && state.chatMessages.length > state.lastReadCount) {
+            showChatNotification();
+        }
+        
+        renderChatMessages();
+    });
+}
+
+// Show notification indicator
+function showChatNotification() {
+    const notification = document.getElementById('chat-notification');
+    if (notification) {
+        notification.classList.remove('hidden');
+    }
+}
+
+// Hide notification indicator
+function hideChatNotification() {
+    const notification = document.getElementById('chat-notification');
+    if (notification) {
+        notification.classList.add('hidden');
+    }
+    state.lastReadCount = state.chatMessages.length;
+}
+
+// Update chat UI (cooldown, status, etc.)
+function updateChatUI() {
+    const cooldownDisplay = document.getElementById('chat-cooldown-display');
+    const statusDisplay = document.getElementById('chat-status-display');
+    const chatInput = document.getElementById('chat-input');
+    const chatSendBtn = document.getElementById('chat-send-btn');
+    
+    if (!cooldownDisplay || !statusDisplay || !chatInput || !chatSendBtn) return;
+    
+    const isAdmin = state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER;
+    const now = Date.now();
+    
+    // Reset displays
+    cooldownDisplay.textContent = '';
+    statusDisplay.textContent = '';
+    statusDisplay.className = 'chat-status-display';
+    
+    // Check bans and mutes
+    if (state.chatBannedUntil > now) {
+        const remaining = Math.ceil((state.chatBannedUntil - now) / (1000 * 60));
+        statusDisplay.textContent = `🚫 Banni du chat pour ${remaining} minute${remaining > 1 ? 's' : ''}`;
+        statusDisplay.classList.add('banned');
+        chatInput.disabled = true;
+        chatSendBtn.disabled = true;
+        chatInput.style.opacity = '0.5';
+        stopLocalCooldownCounter();
+    } else if (state.chatMutedUntil > now) {
+        const remaining = Math.ceil((state.chatMutedUntil - now) / (1000 * 60));
+        statusDisplay.textContent = `🔇 Muet pour ${remaining} minute${remaining > 1 ? 's' : ''} (langage inapproprié)`;
+        statusDisplay.classList.add('muted');
+        chatInput.disabled = true;
+        chatSendBtn.disabled = true;
+        chatInput.style.opacity = '0.5';
+        stopLocalCooldownCounter();
+    } else if (!isAdmin && state.chatCooldown > now) {
+        // Démarrer le compteur local pour le cooldown
+        startLocalCooldownCounter();
+    } else {
+        cooldownDisplay.textContent = '';
+        statusDisplay.textContent = '';
+        chatInput.disabled = false;
+        chatSendBtn.disabled = false;
+        chatInput.style.opacity = '1';
+        stopLocalCooldownCounter();
+    }
+}
+
+// Compteur local pour le cooldown (pas de requêtes Firebase)
+function startLocalCooldownCounter() {
+    // Arrêter le compteur existant
+    stopLocalCooldownCounter();
+    
+    const cooldownDisplay = document.getElementById('chat-cooldown-display');
+    const chatInput = document.getElementById('chat-input');
+    const chatSendBtn = document.getElementById('chat-send-btn');
+    
+    if (!cooldownDisplay) return;
+    
+    state.chatCooldownInterval = setInterval(() => {
+        const now = Date.now();
+        const isAdmin = state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER;
+        
+        if (isAdmin || state.chatCooldown <= now) {
+            cooldownDisplay.textContent = '';
+            chatInput.disabled = false;
+            chatSendBtn.disabled = false;
+            chatInput.style.opacity = '1';
+            stopLocalCooldownCounter();
+            return;
+        }
+        
+        const remaining = Math.ceil((state.chatCooldown - now) / 1000);
+        cooldownDisplay.textContent = `⏱️ Prochain message dans ${remaining}s`;
+        cooldownDisplay.style.color = 'white';
+        chatInput.disabled = false;
+        chatSendBtn.disabled = true;
+        chatInput.style.opacity = '1';
+    }, 1000); // Actualisation chaque seconde
+}
+
+// Timer d'actualisation de la bannière de punition
+function startPunishmentBannerRefresh() {
+    // Arrêter le timer existant
+    stopPunishmentBannerRefresh();
+    
+    state.punishmentBannerInterval = setInterval(() => {
+        const now = Date.now();
+        
+        // Vérifier si l'utilisateur est encore puni
+        if (state.chatBannedUntil <= now && state.chatMutedUntil <= now) {
+            // Plus puni, arrêter le timer et recharger les messages
+            stopPunishmentBannerRefresh();
+            loadChatMessages();
+            return;
+        }
+        
+        // Actualiser la bannière
+        renderChatMessages();
+    }, 5000); // Actualisation toutes les 5 secondes
+}
+
+function stopPunishmentBannerRefresh() {
+    if (state.punishmentBannerInterval) {
+        clearInterval(state.punishmentBannerInterval);
+        state.punishmentBannerInterval = null;
+    }
+}
+
+function stopLocalCooldownCounter() {
+    if (state.chatCooldownInterval) {
+        clearInterval(state.chatCooldownInterval);
+        state.chatCooldownInterval = null;
+    }
+}
+
+function renderChatMessages() {
+    const messagesContainer = document.getElementById('chat-messages');
+    if (!messagesContainer) return;
+    
+    const now = Date.now();
+    
+    // Check if user is punished and show punishment banner
+    if (state.chatBannedUntil > now || state.chatMutedUntil > now) {
+        const punishmentType = state.chatBannedUntil > now ? 'ban' : 'mute';
+        const expiresAt = punishmentType === 'ban' ? state.chatBannedUntil : state.chatMutedUntil;
+        const remaining = Math.ceil((expiresAt - now) / (1000 * 60));
+        
+        // Get punishment details from active punishments
+        const userPunishment = state.activeChatPunishments?.[state.user?.uid];
+        const reason = userPunishment?.reason || 'Non spécifié';
+        const infractions = userPunishment?.infractions || 0;
+        
+        messagesContainer.innerHTML = `
+            <div class="chat-punishment-banner ${punishmentType}">
+                <div class="punishment-icon">${punishmentType === 'ban' ? '🚫' : '🔇'}</div>
+                <div class="punishment-title">${punishmentType === 'ban' ? 'Banni du chat' : 'Muet du chat'}</div>
+                <div class="punishment-reason">Raison: ${reason}</div>
+                <div class="punishment-duration">Temps restant: ${remaining} minute${remaining > 1 ? 's' : ''}</div>
+                <div class="punishment-details">Infractions: ${infractions}</div>
+                <div class="punishment-expires">Expire: ${new Date(expiresAt).toLocaleString('fr-FR')}</div>
+            </div>
+        `;
+        
+        // Add gray overlay to chat
+        messagesContainer.classList.add('chat-punished');
+        
+        // Démarrer le timer d'actualisation de la bannière
+        startPunishmentBannerRefresh();
+        return;
+    }
+    
+    // Remove gray overlay if not punished
+    messagesContainer.classList.remove('chat-punished');
+    
+    // Arrêter le timer d'actualisation si plus puni
+    stopPunishmentBannerRefresh();
+    
+    // If not punished, check for messages
+    if (state.chatMessages.length === 0) {
+        messagesContainer.innerHTML = '<div class="chat-loading">Aucun message pour le moment</div>';
+        return;
+    }
+    
+    messagesContainer.innerHTML = '';
+    
+    // Vérifier s'il y a plus de 100 messages et ajouter un message de suppression
+    const hasOldMessages = state.chatMessages.length > 100;
+    
+    state.chatMessages.forEach((msg, index) => {
+        // N'afficher que les 100 derniers messages
+        if (index >= state.chatMessages.length - 100) {
+            const messageDiv = createChatMessageElement(msg);
+            messagesContainer.appendChild(messageDiv);
+        }
+    });
+    
+    // Afficher un message si des anciens messages ont été supprimés
+    if (hasOldMessages) {
+        const oldMessagesDiv = document.createElement('div');
+        oldMessagesDiv.className = 'chat-old-messages-notice';
+        oldMessagesDiv.innerHTML = '📝 Messages plus anciens supprimés (conservation des 100 derniers)';
+        messagesContainer.insertBefore(oldMessagesDiv, messagesContainer.firstChild);
+    }
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function createChatMessageElement(msg) {
+    const messageDiv = document.createElement('div');
+    
+    // Add special class for system messages
+    if (msg.isSystemMessage) {
+        messageDiv.className = 'chat-message system-message';
+    } else {
+        messageDiv.className = 'chat-message';
+    }
+    
+    const time = new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    
+    // Check if message is from current user or system
+    const isCurrentUser = state.user && msg.uid === state.user.uid;
+    const isSystem = msg.isSystemMessage || msg.uid === 'system';
+    
+    let userName = msg.author;
+    let adminTag = '';
+    
+    // Don't show admin tag for system messages
+    if (!isSystem && userName === CONFIG.ADMIN_USER) {
+        adminTag = '<span class="chat-admin-tag">[ADMIN]</span> ';
+    }
+    
+    // Create delete button for admin only (not for system messages)
+    const currentUserIsAdmin = state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER;
+    const deleteButton = currentUserIsAdmin && !isSystem ? `
+        <button class="chat-delete-btn" onclick="deleteChatMessage('${msg.id}')" title="Supprimer le message">
+            <i class="ph ph-trash"></i>
+        </button>
+    ` : '';
+    
+    messageDiv.innerHTML = `
+        <div class="chat-message-line">
+            ${deleteButton}
+            <span class="chat-time-badge">${time}</span>
+            <span class="chat-message-author ${isSystem ? 'system-author' : ''}">${adminTag}${userName}:</span>
+            <span class="chat-message-content ${isSystem ? 'system-content' : ''}">${msg.content}</span>
+        </div>
+    `;
+    
+    return messageDiv;
+}
+
+// Fonction pour supprimer un message du chat (admin uniquement)
+async function deleteChatMessage(messageId) {
+    // Vérifier si l'utilisateur est admin
+    if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) {
+        showToast("Accès refusé", "error");
+        return;
+    }
+    
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce message ?")) {
+        return;
+    }
+    
+    try {
+        await db.ref(`chat/${messageId}`).remove();
+        showToast("Message supprimé", "success");
+    } catch (e) {
+        console.error('Erreur lors de la suppression du message:', e);
+        showToast("Erreur lors de la suppression", "error");
+    }
+}
+// Rendre la fonction accessible globalement pour le onclick
+window.deleteChatMessage = deleteChatMessage;
+
+// ================= SYSTÈME D'INACTIVITÉ =================
+function setupInactivitySystem() {
+    // Écouter les changements de visibilité de la page (changement d'onglet)
+    if (document.hidden) {
+        startInactivityTimer();
+    } else {
+        stopInactivityTimer();
+        
+        if (state.isInactive) {
+            resumeFromInactivity();
+        }
+    }
+}
+
+function startInactivityTimer() {
+    if (!document.hidden) return;
+    
+    // Arrêter le timer existant
+    stopInactivityTimer();
+    
+    // Démarrer un nouveau timer avec le temps configuré
+    state.inactivityTimer = setTimeout(() => {
+        // Vérifier que l'onglet est toujours caché avant de déclencher
+        if (document.hidden) {
+            goToInactive();
+        }
+    }, CONFIG.INACTIVITY_TAB_TIMEOUT);
+}
+
+function stopInactivityTimer() {
+    if (state.inactivityTimer) {
+        clearTimeout(state.inactivityTimer);
+        state.inactivityTimer = null;
+    }
+}
+
+function goToInactive() {
+    if (state.isInactive) return; // Déjà inactif
+    
+    // Vérification finale : s'assurer que l'onglet est vraiment caché
+    if (!document.hidden) {
+        return;
+    }
+    
+    state.isInactive = true;
+    state.renderLoopPaused = true;
+    
+    // Mettre en pause les requêtes Firebase
+    pauseFirebaseQueries();
+    
+    // Afficher le popup avec un message contextuel
+    const popup = document.getElementById('inactivity-popup');
+    const messageEl = document.getElementById('inactivity-message');
+    
+    if (messageEl) {
+        messageEl.textContent = `Vous avez quitté l'onglet pendant plus de ${CONFIG.INACTIVITY_TAB_TIMEOUT / 1000} secondes.`;
+    }
+    
+    popup.classList.add('show');
+}
+
+function resumeFromInactivity() {
+    if (!state.isInactive) return; // Déjà actif
+    
+    state.isInactive = false;
+    state.renderLoopPaused = false;
+    
+    resumeFirebaseQueries();
+    
+    const popup = document.getElementById('inactivity-popup');
+    if (popup) {
+        popup.classList.remove('show');
+    }
+}
+
+function pauseFirebaseQueries() {
+    // Arrêter les listeners Firebase
+    if (state.boardRef) {
+        state.boardRef.off('value');
+        state.boardRef = null;
+    }
+    if (state.statusRef) {
+        state.statusRef.off('value');
+        state.statusRef = null;
+    }
+    if (state.chatMessagesRef) {
+        state.chatMessagesRef.off('value');
+        state.chatMessagesRef = null;
+    }
+    if (state.chatPunishmentsRef) {
+        state.chatPunishmentsRef.off('value');
+        state.chatPunishmentsRef = null;
+    }
+    
+    // Arrêter le timer d'inactivité
+    if (state.inactivityTimer) {
+        clearTimeout(state.inactivityTimer);
+        state.inactivityTimer = null;
+    }
+    
+    console.log('🔇 Requêtes Firebase mises en pause');
+}
+
+function resumeFirebaseQueries() {
+    // Reprendre les listeners Firebase
+    if (state.user) {
+        startRealtimeSync(); // Utiliser startRealtimeSync au lieu de setupBoardListeners
+        resumeChatFirebaseListeners(); // Reprendre uniquement les listeners Firebase du chat
+    }
+}
+
+function resumeChatFirebaseListeners() {
+    // Reprendre les listeners Firebase du chat sans réinitialiser les event listeners UI
+    
+    // Listener pour les messages du chat
+    if (state.chatMessagesRef) {
+        state.chatMessagesRef.off('value');
+    }
+    const messagesRef = db.ref('chat').orderByChild('timestamp').limitToLast(100);
+    state.chatMessagesRef = messagesRef;
+    
+    messagesRef.on('value', (snapshot) => {
+        const currentNow = Date.now();
+        if (state.chatBannedUntil > currentNow || state.chatMutedUntil > currentNow) {
+            messagesRef.off('value');
+            renderChatMessages();
+            return;
+        }
+        
+        state.chatMessages = [];
+        snapshot.forEach((childSnapshot) => {
+            state.chatMessages.push({
+                id: childSnapshot.key,
+                ...childSnapshot.val()
+            });
+        });
+        
+        state.chatMessages.sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Check for new messages while chat was closed
+        if (!state.chatWindowOpen && state.chatMessages.length > state.lastReadCount) {
+            showChatNotification();
+        }
+        
+        renderChatMessages();
+    });
+    
+    // Listener pour les punitions
+    if (state.chatPunishmentsRef) {
+        state.chatPunishmentsRef.off('value');
+    }
+    state.chatPunishmentsRef = db.ref('chat_punishments');
+    state.chatPunishmentsRef.on('value', (snapshot) => {
+        state.activeChatPunishments = snapshot.val() || {};
+        updateChatUI();
+    });
+    
+    // Listener pour les punitions de l'utilisateur
+    if (state.user) {
+        db.ref(`chat_punishments/${state.user.uid}`).on('value', (snapshot) => {
+            const punishment = snapshot.val();
+            if (punishment && punishment.expires_at > Date.now()) {
+                if (punishment.type === 'mute') {
+                    state.chatMutedUntil = punishment.expires_at;
+                } else if (punishment.type === 'ban_chat') {
+                    state.chatBannedUntil = punishment.expires_at;
+                }
+            } else if (!punishment) {
+                state.chatMutedUntil = 0;
+                state.chatBannedUntil = 0;
+            }
+            updateChatUI();
+        });
+    }
+    
+    // Recharger les messages si le chat est ouvert
+    if (state.chatWindowOpen) {
+        loadChatMessages();
+    }
+}
+
+// Rendre la fonction accessible globalement
+window.resumeFromInactivity = resumeFromInactivity;
+
+// ================= SYSTÈME DE RÈGLES =================
+function setupRulesSystem() {
+    const rulesToggleBtn = document.getElementById('rules-toggle-btn');
+    const rulesPopup = document.getElementById('rules-popup');
+    
+    if (!rulesToggleBtn || !rulesPopup) return;
+    
+    // Ouvrir le popup des règles
+    rulesToggleBtn.addEventListener('click', () => {
+        rulesPopup.classList.add('show');
+        // Mettre en pause le jeu pendant la lecture des règles
+        if (!state.isInactive) {
+            state.renderLoopPaused = true;
+        }
+    });
+    
+    // Fermer le popup en cliquant sur l'arrière-plan
+    rulesPopup.addEventListener('click', (e) => {
+        if (e.target === rulesPopup) {
+            closeRulesPopup();
+        }
+    });
+    
+    // Fermer avec la touche Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && rulesPopup.classList.contains('show')) {
+            closeRulesPopup();
+        }
+    });
+}
+
+function closeRulesPopup() {
+    const rulesPopup = document.getElementById('rules-popup');
+    if (rulesPopup) {
+        rulesPopup.classList.remove('show');
+        // Reprendre le jeu
+        if (!state.isInactive) {
+            state.renderLoopPaused = false;
+        }
+    }
+}
+
+// Rendre la fonction accessible globalement
+window.closeRulesPopup = closeRulesPopup;
+
+async function sendChatMessage() {
+    const chatInput = document.getElementById('chat-input');
+    const content = chatInput.value.trim();
+    
+    if (!content) return;
+    
+    // Check if user is logged in
+    if (!state.user || !state.userProfile) {
+        showToast("Tu dois être connecté pour chatter", "error");
+        return;
+    }
+    
+    // Check chat ban
+    if (state.chatBannedUntil > Date.now()) {
+        const remaining = Math.ceil((state.chatBannedUntil - Date.now()) / (1000 * 60));
+        showToast(`Tu es banni du chat pour ${remaining} minutes`, "error");
+        return;
+    }
+    
+    // Check mute
+    if (state.chatMutedUntil > Date.now()) {
+        const remaining = Math.ceil((state.chatMutedUntil - Date.now()) / (1000 * 60));
+        showToast(`Tu es muet pour ${remaining} minutes`, "error");
+        return;
+    }
+    
+    // Check cooldown (except for admin)
+    const isAdmin = state.userProfile.username_norm === CONFIG.ADMIN_USER;
+    if (!isAdmin && state.chatCooldown > Date.now()) {
+        const remaining = Math.ceil((state.chatCooldown - Date.now()) / 1000);
+        showToast(`Attends ${remaining} secondes`, "error");
+        return;
+    }
+    
+    // Check for bad words
+    const hasBadWord = checkBadWords(content);
+    if (hasBadWord && !isAdmin) {
+        await handleBadWordInfraction();
+        return; // Pas de toast ici, handleBadWordInfraction s'en occupe
+    }
+    
+    // Check for spam
+    const isSpam = checkSpam(content);
+    if (isSpam && !isAdmin) {
+        await handleSpamInfraction();
+        showToast("Tu as été muet pour spam", "error");
+        return;
+    }
+    
+    try {
+        // Send message
+        const messageData = {
+            uid: state.user.uid,
+            author: state.userProfile.username,
+            content: content,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        };
+        
+        await db.ref('chat').push(messageData);
+        
+        // Nettoyer les anciens messages après l'envoi
+        cleanupOldChatMessages();
+        
+        // Set cooldown (except for admin) and start local counter immediately
+        if (!isAdmin) {
+            state.chatCooldown = Date.now() + CONFIG.CHAT_COOLDOWN_MS; // Utiliser la constante CHAT (10 secondes)
+            startLocalCooldownCounter(); // Démarrer immédiatement le compteur local
+        }
+        
+        // Clear input
+        chatInput.value = '';
+        
+        // Update message tracking
+        updateMessageTracking(content);
+        
+    } catch (error) {
+        showToast("Erreur lors de l'envoi", "error");
+    }
+}
+
+// Function to send system announcements (admin only)
+async function sendSystemAnnouncement(content) {
+    if (!content || !content.trim()) {
+        showToast("Le message ne peut pas être vide", "error");
+        return;
+    }
+    
+    // Check if user is admin
+    if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) {
+        showToast("Accès refusé", "error");
+        return;
+    }
+    
+    try {
+        // Send system message using Realtime Database (like normal chat)
+        const messageData = {
+            uid: 'system', // Special UID for system messages
+            author: 'Système', // Special author name
+            content: content.trim(),
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            isSystemMessage: true // Flag to identify system messages
+        };
+        
+        await db.ref('chat').push(messageData);
+        
+        // Nettoyer les anciens messages après l'envoi
+        cleanupOldChatMessages();
+        
+        showToast("Annonce système envoyée", "success");
+        
+    } catch (error) {
+        console.error('Error sending system announcement:', error);
+        showToast("Erreur lors de l'envoi de l'annonce", "error");
+    }
+}
+
+// Fonction pour nettoyer les anciens messages dans Firebase (garde seulement les 100 derniers)
+async function cleanupOldChatMessages() {
+    try {
+        const messagesRef = db.ref('chat').orderByChild('timestamp');
+        const snapshot = await messagesRef.once('value');
+        const messages = [];
+        
+        snapshot.forEach((childSnapshot) => {
+            messages.push({
+                id: childSnapshot.key,
+                ...childSnapshot.val()
+            });
+        });
+        
+        // Si plus de 100 messages, supprimer les plus anciens
+        if (messages.length > 100) {
+            const messagesToDelete = messages.slice(0, messages.length - 100);
+            const updates = {};
+            
+            messagesToDelete.forEach(msg => {
+                updates[msg.id] = null; // Supprimer le message
+            });
+            
+            await db.ref('chat').update(updates);
+            console.log(`Nettoyé ${messagesToDelete.length} anciens messages du chat`);
+        }
+    } catch (error) {
+        console.error('Erreur lors du nettoyage des anciens messages:', error);
+    }
+}
+
+function checkBadWords(content) {
+    const normalizedContent = content.toLowerCase().replace(/\s+/g, ' ');
+    
+    return state.badWords.some(badWord => {
+        // Check if bad word is a whole word (not part of another word)
+        const regex = new RegExp(`\\b${badWord}\\b`, 'gi');
+        return regex.test(normalizedContent);
+    });
+}
+
+function checkSpam(content) {
+    const now = Date.now();
+    const normalizedContent = content.toLowerCase().replace(/\s+/g, '');
+    
+    // Add current message to tracking
+    state.lastMessageTimes.push({ time: now, content: normalizedContent });
+    
+    // Keep only last 3 minutes
+    state.lastMessageTimes = state.lastMessageTimes.filter(msg => now - msg.time < 180000);
+    
+    // Count identical messages in last 3 minutes
+    const identicalCount = state.lastMessageTimes.filter(msg => msg.content === normalizedContent).length;
+    
+    return identicalCount >= 5;
+}
+
+function updateMessageTracking(content) {
+    state.chatMessageCount++;
+    state.lastMessageTimes.push({ time: Date.now(), content: content.toLowerCase().replace(/\s+/g, '') });
+    
+    // Keep only last 3 minutes
+    const threeMinutesAgo = Date.now() - 180000;
+    state.lastMessageTimes = state.lastMessageTimes.filter(msg => msg.time > threeMinutesAgo);
+}
+
+async function handleBadWordInfraction() {
+    state.chatInfractions++;
+    
+    const rules = state.chatPunishmentRules;
+    let punishmentType = 'warning';
+    let duration = 0;
+    let message = '';
+    
+    // Déterminer la punition selon le nombre d'infractions
+    if (state.chatInfractions >= rules.thresholds.banDef) {
+        // Ban définitif
+        punishmentType = 'ban_chat';
+        duration = rules.durations.banDef;
+        message = '🚫 Banni définitivement du chat pour langage inapproprié';
+        
+        // Also ban from game permanently
+        await db.ref(`bans/${state.user.uid}`).set({ expires_at: 0 });
+        showToast("🚫 Banni définitivement du jeu", "error");
+        
+    } else if (state.chatInfractions >= rules.thresholds.ban1week) {
+        // Ban jeu 1 semaine
+        punishmentType = 'ban_chat';
+        duration = rules.durations.muteDef; // Ban chat définitif
+        message = `🚫 Banni du chat définitivement (ban jeu 1 semaine)`;
+        
+        // Also ban from game for 1 week
+        const gameBanExpires = Date.now() + rules.durations.ban1week;
+        await db.ref(`bans/${state.user.uid}`).set({ expires_at: gameBanExpires });
+        showToast("🚫 Banni du jeu pour 1 semaine", "error");
+        
+    } else if (state.chatInfractions >= rules.thresholds.ban1day) {
+        // Ban jeu 1 jour
+        punishmentType = 'ban_chat';
+        duration = rules.durations.mute1week; // Mute chat 1 semaine
+        message = `🚫 Banni du chat pour 1 semaine (ban jeu 1 jour)`;
+        
+        // Also ban from game for 1 day
+        const gameBanExpires = Date.now() + rules.durations.ban1day;
+        await db.ref(`bans/${state.user.uid}`).set({ expires_at: gameBanExpires });
+        showToast("🚫 Banni du jeu pour 1 jour", "error");
+        
+    } else if (state.chatInfractions >= rules.thresholds.mute1week) {
+        // Mute 1 semaine
+        punishmentType = 'mute';
+        duration = rules.durations.mute1week;
+        message = `🔇 Muet du chat pour 1 semaine (langage inapproprié)`;
+        
+    } else if (state.chatInfractions >= rules.thresholds.mute1day) {
+        // Mute 1 jour
+        punishmentType = 'mute';
+        duration = rules.durations.mute1day;
+        message = `🔇 Muet du chat pour 1 jour (langage inapproprié)`;
+        
+    } else if (state.chatInfractions >= rules.thresholds.mute20min) {
+        // Mute 20 minutes
+        punishmentType = 'mute';
+        duration = rules.durations.mute20min;
+        message = `🔇 Muet du chat pour 20 minutes (langage inapproprié)`;
+        
+    } else if (state.chatInfractions >= rules.thresholds.mute5min) {
+        // Mute 5 minutes
+        punishmentType = 'mute';
+        duration = rules.durations.mute5min;
+        message = `🔇 Muet du chat pour 5 minutes (langage inapproprié)`;
+        
+    } else if (state.chatInfractions >= rules.thresholds.warning) {
+        // Warning
+        message = `⚠️ Avertissement : langage inapproprié (${state.chatInfractions}/${rules.thresholds.mute5min - 1} avant mute)`;
+    }
+    
+    // Appliquer la punition si nécessaire
+    if (punishmentType !== 'warning' && duration >= 0) {
+        await applyChatPunishment(punishmentType, duration, 'Langage inapproprié');
+    }
+    
+    // Afficher le message
+    if (message) {
+        showToast(message, "error");
+    }
+}
+
+async function handleSpamInfraction() {
+    // Spam: 10 minutes mute
+    await applyChatPunishment('mute', 10 * 60 * 1000, 'Spam');
+    showToast("🔇 Tu as été muet pour spam par l'auto-modération", "error");
+}
+
+async function applyChatPunishment(type, duration, reason) {
+    const expiresAt = duration > 0 ? Date.now() + duration : 0;
+    
+    await db.ref(`chat_punishments/${state.user.uid}`).set({
+        type: type,
+        reason: reason,
+        expires_at: expiresAt,
+        infractions: state.chatInfractions
+    });
+    
+    // Update local state
+    if (type === 'mute') {
+        state.chatMutedUntil = expiresAt;
+    } else if (type === 'ban_chat') {
+        state.chatBannedUntil = expiresAt;
+    }
+    
+    // Mettre à jour l'UI immédiatement
+    updateChatUI();
+}
+
+function renderActiveBans() {
+    const content = document.getElementById('active-bans-content');
+    if (!content) return;
+    
+    content.innerHTML = '';
+    
+    Object.entries(state.activeBans || {}).forEach(([uid, ban]) => {
+        if (ban.expires_at > Date.now()) {
+            const expiresAt = new Date(ban.expires_at);
+            // Récupérer le bon nom depuis la whitelist en priorité
+            const whitelistUser = state.whitelistCache.find(u => u.id === uid);
+            const onlineUser = state.onlineUsers[uid];
+            const userName = whitelistUser ? prettyName(whitelistUser.id) : (onlineUser?.name || uid.substring(0, 8));
+            const remaining = Math.ceil((ban.expires_at - Date.now()) / (1000 * 60));
+            
+            const item = document.createElement('div');
+            item.className = 'active-item ban';
+            item.innerHTML = `
+                <div class="active-item-header">
+                    <span>🚫 ${userName}</span>
+                    <span style="color: #ff0040;">${remaining}min</span>
+                </div>
+                <div class="active-item-details">
+                    Expire: ${expiresAt.toLocaleString('fr-FR')}<br>
+                    Temps restant: ${remaining} minutes
+                </div>
+            `;
+            content.appendChild(item);
+        }
+    });
+    
+    if (content.children.length === 0) {
+        content.innerHTML = '<p style="color: #888; font-style: italic;">Aucun ban actif</p>';
+    }
+}
+
+// ================= UTILITAIRES TEXTE =================
 function normalizeName(name) {
     if(!name) return "";
     return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -143,19 +1247,7 @@ function prettyName(name) {
 }
 
 /* ================= INIT & AUTH ================= */
-let __bootstrapped = false;
-
-function bootstrapApp() {
-    if (__bootstrapped) return;
-    __bootstrapped = true;
-
-    setupAuthUI();
-    setupAdminListeners();
-    setupGlobalUiListeners();
-    setupAdminTabs();
-    auth.onAuthStateChanged(handleAuthState);
-    fetchWhitelist(); // Charge le cache initial
-}
+// ANCIEN BOOTSTRAP SUPPRIMÉ - UTILISER aggressiveBootstrap()
 
 function setupAdminTabs() {
     const modal = document.getElementById('admin-modal');
@@ -190,45 +1282,114 @@ function setupAdminTabs() {
     if (defaultTabId) openTab(defaultTabId);
 }
 
-document.addEventListener('DOMContentLoaded', bootstrapApp);
-
-// Important: si script.js est chargé après DOMContentLoaded (cache busting / injection),
-// l'événement ne se déclenche plus. On bootstrap donc immédiatement si le DOM est prêt.
-if (document.readyState !== 'loading') {
-    bootstrapApp();
-}
-
 async function handleAuthState(user) {
     if (user) {
+        updateLoadingProgress('Chargement du profil...', 90);
         try {
-            const doc = await firestore.collection('users').doc(user.uid).get();
-            if (!doc.exists) { await auth.signOut(); return; }
-            state.user = user; state.userProfile = doc.data();
+            // Ajouter un timeout pour éviter le blocage infini
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Timeout loading user profile')), 10000);
+            });
+            
+            const docPromise = firestore.collection('users').doc(user.uid).get();
+            const doc = await Promise.race([docPromise, timeoutPromise]);
+            
+            if (!doc.exists) { 
+                await auth.signOut(); 
+                return; 
+            }
+            
+            state.user = user; 
+            state.userProfile = doc.data();
             
             // Charger la couleur persistante de l'utilisateur
             const userData = doc.data();
+            
             if (userData.selected_color && CONFIG.PALETTE.includes(userData.selected_color)) {
                 state.selectedColor = userData.selected_color;
                 state.userColor = userData.selected_color;
             }
             
-            updateUserInterface(); initGameEngine();
+            updateUserInterface(); 
+            initGameEngine();
+            
             await loadPublicConfigOnce();
             startVersionChecks();
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('register-modal').classList.add('hidden');
-            document.getElementById('game-ui').classList.remove('hidden');
+            
+            const loadingScreen = document.getElementById('loading-screen');
+            const authScreen = document.getElementById('auth-screen');
+            const registerModal = document.getElementById('register-modal');
+            const gameUI = document.getElementById('game-ui');
+            
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
+            }
+            
+            if (authScreen) {
+                authScreen.classList.add('hidden');
+            }
+            
+            if (registerModal) {
+                registerModal.classList.add('hidden');
+            }
+            
+            if (gameUI) {
+                gameUI.classList.remove('hidden');
+            }
+            
+            // Afficher les boutons chat et règles seulement quand l'utilisateur est connecté
+            const chatToggleBtn = document.getElementById('chat-toggle-btn');
+            const rulesToggleBtn = document.getElementById('rules-toggle-btn');
+            if (chatToggleBtn) {
+                chatToggleBtn.classList.add('visible');
+            }
+            if (rulesToggleBtn) {
+                rulesToggleBtn.classList.add('visible');
+            }
+            
             showToast(`Bon retour, ${state.userProfile.username} !`, 'success');
+            
         } catch (e) {
-            console.error(e); showAuthError('login-error', "Erreur profil.");
+            console.error('Error during user initialization:', e);
+            
+            let errorMessage = "Erreur profil.";
+            if (e.code === 'permission-denied') {
+                errorMessage = "Accès refusé. Vérifiez votre connexion.";
+            } else if (e.code === 'not-found') {
+                errorMessage = "Profil introuvable. Contactez un admin.";
+            } else if (e.code === 'unavailable') {
+                errorMessage = "Service indisponible. Réessayez plus tard.";
+            } else if (e.message && e.message.includes('Timeout')) {
+                errorMessage = "Timeout de connexion. Vérifiez votre réseau.";
+            } else if (e.message) {
+                errorMessage = `Erreur: ${e.message}`;
+            }
+            
+            showAuthError('login-error', errorMessage);
             document.getElementById('loading-screen').classList.add('hidden');
             document.getElementById('auth-screen').classList.remove('hidden');
+            
+            // Si l'erreur est un timeout, essayer de déconnecter et reconnecter
+            if (e.message && e.message.includes('Timeout')) {
+                setTimeout(() => {
+                    auth.signOut().catch(err => console.log('Sign out error:', err));
+                }, 1000);
+            }
         }
     } else {
         document.getElementById('game-ui').classList.add('hidden');
         document.getElementById('loading-screen').classList.add('hidden');
         document.getElementById('auth-screen').classList.remove('hidden');
+        
+        // Cacher les boutons chat et règles quand l'utilisateur est déconnecté
+        const chatToggleBtn = document.getElementById('chat-toggle-btn');
+        const rulesToggleBtn = document.getElementById('rules-toggle-btn');
+        if (chatToggleBtn) {
+            chatToggleBtn.classList.remove('visible');
+        }
+        if (rulesToggleBtn) {
+            rulesToggleBtn.classList.remove('visible');
+        }
     }
 }
 
@@ -250,6 +1411,9 @@ function setupGlobalUiListeners() {
 }
 
 function setupAuthUI() {
+    // Charger la whitelist au démarrage
+    fetchWhitelist();
+    
     document.getElementById('btn-open-register').onclick = () => {
         document.getElementById('auth-screen').classList.add('hidden');
         document.getElementById('register-modal').classList.remove('hidden');
@@ -300,7 +1464,7 @@ function setupAuthUI() {
         } else {
             suggestionsList.classList.add('hidden');
         }
-
+        
         // Détection Exacte pour Faction (affiche en temps réel)
         const user = state.whitelistCache.find(u => u.id === val);
         const badge = document.getElementById('reg-faction-badge');
@@ -479,20 +1643,354 @@ async function renderAdminCurrentAnnouncement() {
             container.innerHTML = '<p style="color: #888; font-style: italic;">Aucune annonce publiée</p>';
         }
     } catch (e) {
+        console.warn('Error loading announcement:', e);
         container.innerHTML = '<p style="color: #ff6b6b;">Erreur lors du chargement</p>';
     }
 }
 
 async function fetchWhitelist() {
     try {
-        const snap = await firestore.collection('whitelist').get();
+        const snapPromise = firestore.collection('whitelist').get();
+        const snap = await Promise.race([snapPromise, new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout loading whitelist')), 5000))]);
+            
         state.whitelistCache = [];
         snap.forEach(doc => state.whitelistCache.push({ id: doc.id, faction: doc.data().faction }));
+            
         if (!document.getElementById('admin-modal').classList.contains('hidden')) renderAdminUserList();
-    } catch (e) { console.warn("Whitelist offline"); }
+    } catch (e) { 
+        console.warn("Whitelist offline:", e.message); 
+    }
+}
+// ================= ADMIN CHAT FUNCTIONS =================
+function setupAdminChatListeners() {
+    const applyPunishmentBtn = document.getElementById('btn-admin-apply-chat-punishment');
+    const removePunishmentBtn = document.getElementById('btn-admin-remove-chat-punishment');
+    
+    if (applyPunishmentBtn && !applyPunishmentBtn.hasListener) {
+        applyPunishmentBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            
+            // Get selected user
+            let uid = document.getElementById('admin-chat-target')?.value || '';
+            let targetName = '';
+            
+            // If no UID selected, try offline name
+            if (!uid) {
+                const offlineName = document.getElementById('admin-chat-offline-name')?.value?.trim();
+                if (!offlineName) return showToast("Choisis un joueur en ligne ou entre un prénom", "error");
+                
+                // Find user in whitelist
+                let whitelistUser = state.whitelistCache.find(u => 
+                    u.id.toLowerCase() === offlineName.toLowerCase()
+                );
+                
+                if (!whitelistUser) {
+                    whitelistUser = state.whitelistCache.find(u => 
+                        prettyName(u.id).toLowerCase() === offlineName.toLowerCase()
+                    );
+                }
+                
+                if (!whitelistUser) {
+                    const normalizedName = normalizeName(offlineName);
+                    whitelistUser = state.whitelistCache.find(u => u.id === normalizedName);
+                }
+                
+                if (!whitelistUser) {
+                    return showToast("Joueur non trouvé dans la whitelist", "error");
+                }
+                
+                // Get real UID
+                const realUid = await findUserUidByName(whitelistUser.id);
+                if (!realUid) {
+                    return showToast("Impossible de trouver l'UID du joueur", "error");
+                }
+                
+                uid = realUid;
+                targetName = prettyName(whitelistUser.id);
+            } else {
+                const onlineUser = state.onlineUsers[uid];
+                targetName = onlineUser?.name || uid;
+            }
+            
+            const action = document.getElementById('admin-chat-action')?.value || 'mute';
+            const duration = parseInt(document.getElementById('admin-chat-duration')?.value || '0', 10);
+            const unit = document.getElementById('admin-chat-unit')?.value || 'minutes';
+            
+            if (!duration || duration <= 0) return showToast("Durée invalide", "error");
+            
+            const mult = unit === 'days' ? 24 * 60 * 60 * 1000 : unit === 'hours' ? 60 * 60 * 1000 : 60 * 1000;
+            const durationMs = duration * mult;
+            
+            try {
+                await applyChatPunishment(uid, action, durationMs);
+                showToast(`${targetName} ${action === 'mute' ? 'muet' : 'banni du chat'} pour ${duration} ${unit}`, "success");
+                
+                // Clear fields
+                document.getElementById('admin-chat-target').value = '';
+                document.getElementById('admin-chat-offline-name').value = '';
+                document.getElementById('admin-chat-duration').value = '';
+            } catch (e) {
+                showToast("Erreur lors de l'application", "error");
+            }
+        });
+        applyPunishmentBtn.hasListener = true;
+    }
+    
+    if (removePunishmentBtn && !removePunishmentBtn.hasListener) {
+        removePunishmentBtn.addEventListener('click', async () => {
+            if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
+            
+            // Get selected user
+            let uid = document.getElementById('admin-chat-target')?.value || '';
+            let targetName = '';
+            
+            // If no UID selected, try offline name
+            if (!uid) {
+                const offlineName = document.getElementById('admin-chat-offline-name')?.value?.trim();
+                if (!offlineName) return showToast("Choisis un joueur en ligne ou entre un prénom", "error");
+                
+                // Find user in whitelist
+                let whitelistUser = state.whitelistCache.find(u => 
+                    u.id.toLowerCase() === offlineName.toLowerCase()
+                );
+                
+                if (!whitelistUser) {
+                    whitelistUser = state.whitelistCache.find(u => 
+                        prettyName(u.id).toLowerCase() === offlineName.toLowerCase()
+                    );
+                }
+                
+                if (!whitelistUser) {
+                    const normalizedName = normalizeName(offlineName);
+                    whitelistUser = state.whitelistCache.find(u => u.id === normalizedName);
+                }
+                
+                if (!whitelistUser) {
+                    return showToast("Joueur non trouvé dans la whitelist", "error");
+                }
+                
+                // Get real UID
+                const realUid = await findUserUidByName(whitelistUser.id);
+                if (!realUid) {
+                    return showToast("Impossible de trouver l'UID du joueur", "error");
+                }
+                
+                uid = realUid;
+                targetName = prettyName(whitelistUser.id);
+            } else {
+                const onlineUser = state.onlineUsers[uid];
+                targetName = onlineUser?.name || uid;
+            }
+            
+            try {
+                await db.ref(`chat_punishments/${uid}`).remove();
+                showToast(`${targetName} n'est plus puni`, "success");
+                
+                // Clear fields
+                document.getElementById('admin-chat-target').value = '';
+                document.getElementById('admin-chat-offline-name').value = '';
+            } catch (e) {
+                showToast("Erreur lors du retrait", "error");
+            }
+        });
+        removePunishmentBtn.hasListener = true;
+    }
 }
 
-/* ================= ADMIN ================= */
+function renderAdminChatSelects() {
+    const chatSelect = document.getElementById('admin-chat-target');
+    const infractionsSelect = document.getElementById('admin-infractions-target');
+    
+    if (!chatSelect && !infractionsSelect) return;
+    
+    const currentChat = chatSelect?.value || '';
+    const currentInfractions = infractionsSelect?.value || '';
+    
+    if (chatSelect) {
+        chatSelect.innerHTML = '<option value="">Choisir un joueur en ligne</option>';
+    }
+    if (infractionsSelect) {
+        infractionsSelect.innerHTML = '<option value="">Choisir un joueur en ligne</option>';
+    }
+    
+    Object.entries(state.onlineUsers).forEach(([uid, info]) => {
+        if (chatSelect) {
+            const opt = document.createElement('option');
+            opt.value = uid;
+            opt.textContent = info?.name ? info.name : uid;
+            chatSelect.appendChild(opt);
+        }
+        
+        if (infractionsSelect) {
+            const opt = document.createElement('option');
+            opt.value = uid;
+            opt.textContent = info?.name ? info.name : uid;
+            infractionsSelect.appendChild(opt);
+        }
+    });
+    
+    if (chatSelect && [...chatSelect.options].some(o => o.value === currentChat)) {
+        chatSelect.value = currentChat;
+    }
+    if (infractionsSelect && [...infractionsSelect.options].some(o => o.value === currentInfractions)) {
+        infractionsSelect.value = currentInfractions;
+    }
+}
+
+// Fonctions pour gérer les infractions
+async function viewUserInfractions() {
+    const targetSelect = document.getElementById('admin-infractions-target');
+    const offlineNameInput = document.getElementById('admin-infractions-offline-name');
+    const detailsDiv = document.getElementById('infractions-details');
+    const userNameSpan = document.getElementById('infractions-user-name');
+    const contentDiv = document.getElementById('infractions-content');
+    
+    if (!detailsDiv || !userNameSpan || !contentDiv) return;
+    
+    let uid = targetSelect.value;
+    let targetName = '';
+    
+    if (!uid && offlineNameInput.value.trim()) {
+        // Recherche hors ligne
+        const offlineName = offlineNameInput.value.trim();
+        const whitelistUser = state.whitelistCache.find(u => 
+            prettyName(u.id).toLowerCase() === offlineName.toLowerCase()
+        );
+        
+        if (!whitelistUser) {
+            const normalizedName = normalizeName(offlineName);
+            const foundUser = state.whitelistCache.find(u => u.id === normalizedName);
+            if (foundUser) {
+                targetName = prettyName(foundUser.id);
+                uid = foundUser.id;
+            }
+        } else {
+            targetName = prettyName(whitelistUser.id);
+            uid = whitelistUser.id;
+        }
+        
+        if (!uid) {
+            return showToast("Joueur non trouvé", "error");
+        }
+    } else if (uid) {
+        const onlineUser = state.onlineUsers[uid];
+        targetName = onlineUser?.name || uid;
+    } else {
+        return showToast("Veuillez sélectionner un joueur", "error");
+    }
+    
+    try {
+        // Récupérer les infractions depuis Firebase
+        const infractionsSnapshot = await db.ref(`users/${uid}/chatInfractions`).once('value');
+        const infractions = infractionsSnapshot.val() || 0;
+        
+        // Récupérer les punitions actives
+        const punishmentsSnapshot = await db.ref(`chat_punishments/${uid}`).once('value');
+        const activePunishment = punishmentsSnapshot.val();
+        
+        userNameSpan.textContent = targetName;
+        
+        let html = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span><strong>Infractions totales:</strong> ${infractions}</span>
+                <span><strong>Punition active:</strong> ${activePunishment ? `${activePunishment.type} (${Math.ceil((activePunishment.expires_at - Date.now()) / (1000 * 60))} min)` : 'Aucune'}</span>
+            </div>
+        `;
+        
+        if (activePunishment) {
+            html += `
+                <div style="background: rgba(255,0,64,0.1); padding: 8px; border-radius: 4px; margin-top: 10px;">
+                    <strong>Détails de la punition:</strong><br>
+                    Type: ${activePunishment.type}<br>
+                    Raison: ${activePunishment.reason || 'Non spécifié'}<br>
+                    Infractions: ${activePunishment.infractions || 0}<br>
+                    Expire: ${new Date(activePunishment.expires_at).toLocaleString('fr-FR')}
+                </div>
+            `;
+        }
+        
+        contentDiv.innerHTML = html;
+        detailsDiv.style.display = 'block';
+        
+    } catch (e) {
+        console.error('Erreur lors de la récupération des infractions:', e);
+        showToast("Erreur lors de la récupération des infractions", "error");
+    }
+}
+
+async function resetUserInfractions() {
+    const targetSelect = document.getElementById('admin-infractions-target');
+    const offlineNameInput = document.getElementById('admin-infractions-offline-name');
+    
+    let uid = targetSelect.value;
+    let targetName = '';
+    
+    if (!uid && offlineNameInput.value.trim()) {
+        // Recherche hors ligne
+        const offlineName = offlineNameInput.value.trim();
+        const whitelistUser = state.whitelistCache.find(u => 
+            prettyName(u.id).toLowerCase() === offlineName.toLowerCase()
+        );
+        
+        if (!whitelistUser) {
+            const normalizedName = normalizeName(offlineName);
+            const foundUser = state.whitelistCache.find(u => u.id === normalizedName);
+            if (foundUser) {
+                targetName = prettyName(foundUser.id);
+                uid = foundUser.id;
+            }
+        } else {
+            targetName = prettyName(whitelistUser.id);
+            uid = whitelistUser.id;
+        }
+        
+        if (!uid) {
+            return showToast("Joueur non trouvé", "error");
+        }
+    } else if (uid) {
+        const onlineUser = state.onlineUsers[uid];
+        targetName = onlineUser?.name || uid;
+    } else {
+        return showToast("Veuillez sélectionner un joueur", "error");
+    }
+    
+    if (!confirm(`Êtes-vous sûr de vouloir réinitialiser les infractions de ${targetName} ?`)) {
+        return;
+    }
+    
+    try {
+        // Réinitialiser les infractions dans Firebase
+        await db.ref(`users/${uid}/chatInfractions`).set(0);
+        
+        // Si l'utilisateur est en ligne, mettre à jour l'état local
+        if (state.onlineUsers[uid]) {
+            // Forcer la relecture des infractions depuis Firebase
+            db.ref(`users/${uid}/chatInfractions`).once('value').then(snapshot => {
+                const infractions = snapshot.val() || 0;
+                // Mettre à jour l'état local si nécessaire
+                if (state.user && state.user.uid === uid) {
+                    state.chatInfractions = infractions;
+                }
+            });
+        }
+        
+        showToast(`Infractions de ${targetName} réinitialisées`, "success");
+        
+        // Cacher les détails et réinitialiser les champs
+        document.getElementById('infractions-details').style.display = 'none';
+        targetSelect.value = '';
+        offlineNameInput.value = '';
+        
+        // Rafraîchir l'affichage
+        viewUserInfractions();
+        
+    } catch (e) {
+        console.error('Erreur lors de la réinitialisation des infractions:', e);
+        showToast("Erreur lors de la réinitialisation des infractions", "error");
+    }
+}
+
+// ================= ADMIN ================= */
 function setupAdminListeners() {
     document.getElementById('btn-close-admin').onclick = () => document.getElementById('admin-modal').classList.add('hidden');
     
@@ -570,6 +2068,40 @@ function setupAdminListeners() {
         saveVersionBtn.hasListener = true;
     }
 
+    const viewInfractionsBtn = document.getElementById('btn-admin-view-infractions');
+    if (viewInfractionsBtn && !viewInfractionsBtn.hasListener) {
+        viewInfractionsBtn.addEventListener('click', viewUserInfractions);
+        viewInfractionsBtn.hasListener = true;
+    }
+
+    // Chat announcement listeners
+    const sendChatAnnouncementBtn = document.getElementById('btn-admin-send-chat-announcement');
+    if (sendChatAnnouncementBtn && !sendChatAnnouncementBtn.hasListener) {
+        sendChatAnnouncementBtn.addEventListener('click', async () => {
+            const messageInput = document.getElementById('admin-chat-announcement-message');
+            const content = messageInput.value.trim();
+            
+            if (!content) {
+                showToast("Le message ne peut pas être vide", "error");
+                return;
+            }
+            
+            await sendSystemAnnouncement(content);
+            messageInput.value = ''; // Clear input after sending
+        });
+        sendChatAnnouncementBtn.hasListener = true;
+    }
+
+    const clearChatAnnouncementBtn = document.getElementById('btn-admin-clear-chat-announcement');
+    if (clearChatAnnouncementBtn && !clearChatAnnouncementBtn.hasListener) {
+        clearChatAnnouncementBtn.addEventListener('click', () => {
+            const messageInput = document.getElementById('admin-chat-announcement-message');
+            messageInput.value = '';
+            messageInput.focus();
+        });
+        clearChatAnnouncementBtn.hasListener = true;
+    }
+
     const applyBoostBtn = document.getElementById('btn-admin-apply-boost');
     if (applyBoostBtn && !applyBoostBtn.hasListener) {
         applyBoostBtn.addEventListener('click', async () => {
@@ -617,16 +2149,66 @@ function setupAdminListeners() {
     if (applyBanBtn && !applyBanBtn.hasListener) {
         applyBanBtn.addEventListener('click', async () => {
             if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
-            const uid = document.getElementById('admin-ban-target')?.value || '';
-            if (!uid) return showToast("Choisis un joueur", "error");
+            
+            // Essayer de récupérer l'UID depuis la liste des joueurs en ligne
+            let uid = document.getElementById('admin-ban-target')?.value || '';
+            let targetName = '';
+            
+            // Si pas d'UID sélectionné, essayer avec le nom hors ligne
+            if (!uid) {
+                const offlineName = document.getElementById('admin-ban-offline-name')?.value?.trim();
+                if (!offlineName) return showToast("Choisis un joueur en ligne ou entre un prénom", "error");
+                
+                // Chercher d'abord une correspondance exacte (insensible à la casse)
+                let whitelistUser = state.whitelistCache.find(u => 
+                    u.id.toLowerCase() === offlineName.toLowerCase()
+                );
+                
+                // Si pas trouvé, essayer avec prettyName (pour les prénoms avec majuscules)
+                if (!whitelistUser) {
+                    whitelistUser = state.whitelistCache.find(u => 
+                        prettyName(u.id).toLowerCase() === offlineName.toLowerCase()
+                    );
+                }
+                
+                // Si toujours pas trouvé, essayer avec normalizeName (ancienne méthode)
+                if (!whitelistUser) {
+                    const normalizedName = normalizeName(offlineName);
+                    whitelistUser = state.whitelistCache.find(u => u.id === normalizedName);
+                }
+                
+                if (!whitelistUser) {
+                    return showToast("Joueur non trouvé dans la whitelist", "error");
+                }
+                
+                // Récupérer l'UID Firebase réel depuis le nom
+                const realUid = await findUserUidByName(whitelistUser.id);
+                if (!realUid) {
+                    return showToast("Impossible de trouver l'UID du joueur", "error");
+                }
+                
+                uid = realUid;
+                targetName = prettyName(whitelistUser.id);
+            } else {
+                // Récupérer le nom depuis les joueurs en ligne
+                const onlineUser = state.onlineUsers[uid];
+                targetName = onlineUser?.name || uid;
+            }
+            
             const dur = parseInt(document.getElementById('admin-ban-duration')?.value || '0', 10);
             const unit = document.getElementById('admin-ban-unit')?.value || 'minutes';
             if (!dur || dur <= 0) return showToast("Durée invalide", "error");
             const mult = unit === 'weeks' ? 7 * 24 * 60 * 60 * 1000 : unit === 'days' ? 24 * 60 * 60 * 1000 : unit === 'hours' ? 60 * 60 * 1000 : 60 * 1000;
             const expiresAt = Date.now() + (dur * mult);
+            
             try {
                 await db.ref(`bans/${uid}`).set({ expires_at: expiresAt });
-                showToast("Joueur banni", "success");
+                showToast(`${targetName} banni pour ${dur} ${unit}`, "success");
+                
+                // Vider les champs
+                document.getElementById('admin-ban-target').value = '';
+                document.getElementById('admin-ban-offline-name').value = '';
+                document.getElementById('admin-ban-duration').value = '';
             } catch (e) {
                 showToast("Erreur ban", "error");
             }
@@ -638,17 +2220,79 @@ function setupAdminListeners() {
     if (removeBanBtn && !removeBanBtn.hasListener) {
         removeBanBtn.addEventListener('click', async () => {
             if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) return showToast("Accès refusé", "error");
-            const uid = document.getElementById('admin-ban-target')?.value || '';
-            if (!uid) return showToast("Choisis un joueur", "error");
+            
+            // Essayer de récupérer l'UID depuis la liste des joueurs en ligne
+            let uid = document.getElementById('admin-ban-target')?.value || '';
+            let targetName = '';
+            
+            // Si pas d'UID sélectionné, essayer avec le nom hors ligne
+            if (!uid) {
+                const offlineName = document.getElementById('admin-ban-offline-name')?.value?.trim();
+                console.log('Tentative de débannissement pour:', offlineName);
+                
+                if (!offlineName) return showToast("Choisis un joueur en ligne ou entre un prénom", "error");
+                
+                // Chercher d'abord une correspondance exacte (insensible à la casse)
+                let whitelistUser = state.whitelistCache.find(u => 
+                    u.id.toLowerCase() === offlineName.toLowerCase()
+                );
+                
+                console.log('Whitelist user trouvé:', whitelistUser);
+                
+                // Si pas trouvé, essayer avec prettyName (pour les prénoms avec majuscules)
+                if (!whitelistUser) {
+                    whitelistUser = state.whitelistCache.find(u => 
+                        prettyName(u.id).toLowerCase() === offlineName.toLowerCase()
+                    );
+                    console.log('Whitelist user trouvé avec prettyName:', whitelistUser);
+                }
+                
+                // Si toujours pas trouvé, essayer avec normalizeName (ancienne méthode)
+                if (!whitelistUser) {
+                    const normalizedName = normalizeName(offlineName);
+                    whitelistUser = state.whitelistCache.find(u => u.id === normalizedName);
+                    console.log('Whitelist user trouvé avec normalizeName:', whitelistUser, 'pour', normalizedName);
+                }
+                
+                if (!whitelistUser) {
+                    return showToast("Joueur non trouvé dans la whitelist", "error");
+                }
+                
+                // Récupérer l'UID Firebase réel depuis le nom
+                const realUid = await findUserUidByName(whitelistUser.id);
+                console.log('UID réel trouvé:', realUid);
+                
+                if (!realUid) {
+                    return showToast("Impossible de trouver l'UID du joueur", "error");
+                }
+                
+                uid = realUid;
+                targetName = prettyName(whitelistUser.id);
+                console.log('Final - UID:', uid, 'Target:', targetName);
+            } else {
+                // Récupérer le nom depuis les joueurs en ligne
+                const onlineUser = state.onlineUsers[uid];
+                targetName = onlineUser?.name || uid;
+            }
+            
             try {
+                console.log('Tentative de suppression du ban pour UID:', uid);
                 await db.ref(`bans/${uid}`).remove();
-                showToast("Joueur débanni", "success");
+                showToast(`${targetName} débanni`, "success");
+                
+                // Vider les champs
+                document.getElementById('admin-ban-target').value = '';
+                document.getElementById('admin-ban-offline-name').value = '';
             } catch (e) {
-                showToast("Erreur ban", "error");
+                console.error('Erreur débannissement:', e);
+                showToast("Erreur débannissement", "error");
             }
         });
         removeBanBtn.hasListener = true;
     }
+    
+    // Setup chat admin listeners
+    setupAdminChatListeners();
 }
 function openAdminPanel() {
     // Vérifier si c'est bien l'admin
@@ -734,7 +2378,270 @@ function renderAdminOnlineSelects() {
         banSelect.appendChild(opt);
     });
     if ([...banSelect.options].some(o => o.value === currentBan)) banSelect.value = currentBan;
+    
+    // Also render chat selects
+    renderAdminChatSelects();
 }
+
+function selectColor(color) {
+    state.selectedColor = color;
+    playSound('pop');
+}
+
+function updateCooldownProgressBar() {
+    const progressBar = document.getElementById('cooldown-progress-bar');
+    if (!progressBar) return;
+    
+    // Vérifier si le joueur est banni
+    if (state.banExpiresAt && state.banExpiresAt > Date.now()) {
+        progressBar.classList.add('banned');
+        return;
+    }
+    
+    progressBar.classList.remove('banned');
+    
+    // Calculer le temps restant
+    const now = Date.now();
+    const nextPixelTime = state.nextPixelTime || 0;
+    
+    if (now >= nextPixelTime) {
+        // Peut placer un pixel - barre pleine
+        progressBar.style.width = '100%';
+    } else {
+        // En cooldown - barre proportionnelle
+        const timeRemaining = nextPixelTime - now;
+        const progress = 1 - (timeRemaining / state.cooldownMsEffective);
+        const widthPercentage = Math.max(0, Math.min(100, progress * 100));
+        progressBar.style.width = `${widthPercentage}%`;
+    }
+    
+    // Mettre à jour l'indicateur admin
+    updateAdminIndicator();
+}
+
+function updateAdminIndicator() {
+    const indicator = document.getElementById('admin-indicator');
+    if (!indicator) return;
+    
+    if (state.adminNoCooldown && state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER) {
+        indicator.classList.remove('hidden');
+    } else {
+        indicator.classList.add('hidden');
+    }
+}
+
+function renderActiveBoosts() {
+    const content = document.getElementById('active-boosts-content');
+    if (!content) return;
+    
+    content.innerHTML = '';
+    
+    // Tableau pour stocker tous les boosts actifs
+    const activeBoosts = [];
+    
+    // Boost global en premier
+    if (state.globalBoost && state.globalBoost.expires_at > Date.now()) {
+        const expiresAt = new Date(state.globalBoost.expires_at);
+        const cooldownSec = state.globalBoost.cooldown_ms / 1000;
+        
+        activeBoosts.push({
+            type: 'global',
+            name: 'Tous les joueurs',
+            icon: '🌐',
+            cooldownSec: cooldownSec,
+            expiresAt: expiresAt,
+            target: 'global'
+        });
+    }
+    
+    // Boosts utilisateurs
+    Object.entries(state.userBoosts || {}).forEach(([uid, boost]) => {
+        if (boost.expires_at > Date.now()) {
+            const expiresAt = new Date(boost.expires_at);
+            const cooldownSec = boost.cooldown_ms / 1000;
+            // Récupérer le bon nom depuis la whitelist en priorité
+            const whitelistUser = state.whitelistCache.find(u => u.id === uid);
+            const onlineUser = state.onlineUsers[uid];
+            const userName = whitelistUser ? prettyName(whitelistUser.id) : (onlineUser?.name || uid.substring(0, 8));
+            
+            activeBoosts.push({
+                type: 'user',
+                name: userName,
+                icon: '👤',
+                cooldownSec: cooldownSec,
+                expiresAt: expiresAt,
+                target: uid
+            });
+        }
+    });
+    
+    // Afficher tous les boosts
+    activeBoosts.forEach(boost => {
+        const item = document.createElement('div');
+        item.className = 'active-item boost';
+        item.innerHTML = `
+            <div class="active-item-header">
+                <span>${boost.icon} ${boost.name}</span>
+                <span style="color: #00ff88;">${boost.cooldownSec}s</span>
+            </div>
+            <div class="active-item-details">
+                Expire: ${boost.expiresAt.toLocaleString('fr-FR')}<br>
+                Cooldown: ${boost.cooldownSec} secondes
+            </div>
+        `;
+        content.appendChild(item);
+    });
+    
+    if (content.children.length === 0) {
+        content.innerHTML = '<p style="color: #888; font-style: italic;">Aucun boost actif</p>';
+    }
+}
+
+// Fonction pour trouver l'UID Firebase réel depuis le nom normalisé
+async function findUserUidByName(normalizedName) {
+    console.log('Recherche UID pour:', normalizedName);
+    
+    // Chercher d'abord dans les joueurs en ligne
+    for (const [uid, userData] of Object.entries(state.onlineUsers || {})) {
+        if (userData.name && userData.name.toLowerCase() === normalizedName.toLowerCase()) {
+            console.log('UID trouvé en ligne:', uid);
+            return uid;
+        }
+    }
+    
+    // Si pas trouvé en ligne, chercher dans Firestore
+    try {
+        console.log('Recherche dans Firestore pour:', normalizedName);
+        const snapshot = await firestore.collection('users')
+            .where('username_norm', '==', normalizedName)
+            .limit(1)
+            .get();
+        
+        console.log('Résultat Firestore:', snapshot.empty ? 'vide' : snapshot.docs.length + ' docs');
+        
+        if (!snapshot.empty) {
+            const uid = snapshot.docs[0].id;
+            console.log('UID trouvé dans Firestore:', uid);
+            return uid;
+        }
+    } catch (error) {
+        console.error('Erreur recherche UID:', error);
+    }
+    
+    console.log('UID non trouvé pour:', normalizedName);
+    return null;
+}
+
+async function removeBoost(target) {
+    if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) {
+        showToast("Accès refusé", "error");
+        return;
+    }
+    
+    try {
+        if (target === 'global') {
+            await db.ref('boosts/global').remove();
+            showToast("Boost global supprimé", "success");
+        } else {
+            await db.ref(`boosts/users/${target}`).remove();
+            showToast("Boost utilisateur supprimé", "success");
+        }
+    } catch (e) {
+        console.error('Erreur suppression boost:', e);
+        showToast("Erreur suppression boost", "error");
+    }
+}
+
+window.removeBoost = removeBoost; // Rendre accessible globalement
+
+function renderActiveChatPunishments() {
+    const content = document.getElementById('active-chat-punishments-content');
+    if (!content) return;
+    
+    content.innerHTML = '';
+    
+    // Tableau pour stocker toutes les punishments actives
+    const activePunishments = [];
+    
+    Object.entries(state.activeChatPunishments || {}).forEach(([uid, punishment]) => {
+        if (punishment.expires_at > Date.now()) {
+            const expiresAt = new Date(punishment.expires_at);
+            // Récupérer le bon nom depuis la whitelist en priorité
+            const whitelistUser = state.whitelistCache.find(u => u.id === uid);
+            const onlineUser = state.onlineUsers[uid];
+            const userName = whitelistUser ? prettyName(whitelistUser.id) : (onlineUser?.name || uid.substring(0, 8));
+            
+            // Calculer le temps restant
+            const remainingMs = punishment.expires_at - Date.now();
+            const remainingMinutes = Math.ceil(remainingMs / (1000 * 60));
+            const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60));
+            const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+            
+            let timeRemaining;
+            if (remainingMs <= 0) {
+                timeRemaining = 'Expiré';
+            } else if (remainingDays > 1) {
+                timeRemaining = `${remainingDays} jours`;
+            } else if (remainingHours > 1) {
+                timeRemaining = `${remainingHours} heures`;
+            } else {
+                timeRemaining = `${remainingMinutes} minutes`;
+            }
+            
+            activePunishments.push({
+                type: punishment.type,
+                name: userName,
+                uid: uid,
+                icon: punishment.type === 'mute' ? '' : '',
+                timeRemaining: timeRemaining,
+                expiresAt: expiresAt,
+                reason: punishment.reason || 'Non spécifié',
+                infractions: punishment.infractions || 0
+            });
+        }
+    });
+    
+    // Afficher toutes les punishments
+    activePunishments.forEach(punishment => {
+        const item = document.createElement('div');
+        item.className = `active-item ${punishment.type}`;
+        item.innerHTML = `
+            <div class="active-item-header">
+                <span>${punishment.icon} ${punishment.name}</span>
+                <span style="color: ${punishment.type === 'mute' ? '#ffaa00' : '#ff0040'};">${punishment.timeRemaining}</span>
+            </div>
+            <div class="active-item-details">
+                Type: ${punishment.type === 'mute' ? 'Mute' : 'Ban chat'}<br>
+                Raison: ${punishment.reason}<br>
+                Infractions: ${punishment.infractions}<br>
+                Expire: ${punishment.expiresAt.toLocaleString('fr-FR')}
+            </div>
+        `;
+        content.appendChild(item);
+    });
+    
+    if (content.children.length === 0) {
+        content.innerHTML = '<p style="color: #888; font-style: italic;">Aucune punition de chat active</p>';
+    }
+}
+
+async function removeBan(uid) {
+    if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) {
+        showToast("Accès refusé", "error");
+        return;
+    }
+    
+    try {
+        await db.ref(`bans/${uid}`).remove();
+        showToast("Joueur débanni", "success");
+    } catch (e) {
+        console.error('Erreur débannissement:', e);
+        showToast("Erreur débannissement", "error");
+    }
+}
+
+window.removeBan = removeBan; // Rendre accessible globalement
+
 function renderAdminUserList() {
     const ul = document.getElementById('admin-user-list'); ul.innerHTML = '';
     [...state.whitelistCache].sort((a,b)=>a.id.localeCompare(b.id)).forEach(u => {
@@ -758,9 +2665,13 @@ function initGameEngine() {
     state.camera.x = (CONFIG.BOARD_SIZE * CONFIG.PIXEL_SCALE) / 2;
     state.camera.y = (CONFIG.BOARD_SIZE * CONFIG.PIXEL_SCALE) / 2;
     state.camera.zoom = 1.5;
-    resizeCanvas(); window.addEventListener('resize', resizeCanvas);
-    startRealtimeSync(); setupCanvasInput();
+    resizeCanvas(); 
+    setupCanvasInput();
     setupScoreboardInput();
+    setupChatSystem(); // Ajout du système de chat
+    setupInactivitySystem(); // Ajout du système d'inactivité
+    setupRulesSystem(); // Ajout du système de règles
+    startRealtimeSync(); 
     if (state.renderLoopId) cancelAnimationFrame(state.renderLoopId);
     
     // Afficher le pop-up de bienvenue (déverrouille musique et carte)
@@ -776,17 +2687,68 @@ function showWelcomePopup() {
     popup.classList.remove('hidden');
     
     btn.onclick = () => {
-        popup.classList.add('hidden');
-        // Initialiser l'audio après interaction utilisateur
-        initAudio();
-        // Démarrer la musique
+        // Lancer l'animation de découpe
+        startWelcomeAnimation();
+    };
+}
+
+function startWelcomeAnimation() {
+    const popup = document.getElementById('welcome-popup');
+    const welcomeCard = popup.querySelector('.welcome-card');
+    
+    // Fondu très rapide et instantané
+    welcomeCard.style.transition = 'opacity 0.15s ease-out, transform 0.15s ease-out';
+    welcomeCard.style.opacity = '0';
+    welcomeCard.style.transform = 'scale(0.95)';
+    
+    // Initialiser l'audio
+    initAudio();
+    
+    // Démarrer la musique
+    setTimeout(() => {
         if (audioCtx && audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
         if (bgMusic) {
             bgMusic.play().catch(() => console.log('Background music playback failed'));
         }
-    };
+    }, 200);
+    
+    // Masquer le popup immédiatement après le fondu rapide
+    setTimeout(() => {
+        popup.classList.add('hidden');
+        // Réinitialiser les styles pour la prochaine fois
+        welcomeCard.style.transition = '';
+        welcomeCard.style.opacity = '';
+        welcomeCard.style.transform = '';
+        welcomeCard.classList.remove('fading-out');
+    }, 150);
+}
+
+function createParticles(container, rect) {
+    const particleCount = 20;
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'welcome-particle';
+        
+        // Position au centre de la carte
+        particle.style.left = centerX + 'px';
+        particle.style.top = centerY + 'px';
+        
+        // Direction aléatoire
+        const angle = (Math.PI * 2 * i) / particleCount;
+        const velocity = 100 + Math.random() * 200;
+        const tx = Math.cos(angle) * velocity;
+        const ty = Math.sin(angle) * velocity;
+        
+        particle.style.setProperty('--tx', tx + 'px');
+        particle.style.setProperty('--ty', ty + 'px');
+        
+        container.appendChild(particle);
+    }
 }
 
 function resizeCanvas() {
@@ -851,11 +2813,13 @@ function startRealtimeSync() {
     state.boardSyncInterval = setInterval(loadBoardData, 120000);
     
     // Écouter SEULEMENT les CHANGEMENTS futurs, pas les données existantes
-    db.ref('board').off('child_changed', handlePixelUpdate);
-    db.ref('board').on('child_changed', handlePixelUpdate);
-
-    db.ref('board').orderByChild('t').startAt(Date.now() - 5000).off('child_added', handlePixelUpdate);
-    db.ref('board').orderByChild('t').startAt(Date.now() - 5000).on('child_added', handlePixelUpdate);
+    if (state.boardRef) {
+        state.boardRef.off('child_changed', handlePixelUpdate);
+        state.boardRef.off('child_added', handlePixelUpdate);
+    }
+    state.boardRef = db.ref('board');
+    state.boardRef.on('child_changed', handlePixelUpdate);
+    state.boardRef.orderByChild('t').startAt(Date.now() - 5000).on('child_added', handlePixelUpdate);
     
     db.ref(`users/${state.user.uid}/last_pixel`).on('value', snap => {
         state.lastPixelTs = (snap.val() || 0);
@@ -871,6 +2835,16 @@ function startRealtimeSync() {
     db.ref(`boosts/users/${state.user.uid}`).on('value', snap => {
         state.userBoost = snap.val() || null;
         recomputeEffectiveCooldown();
+    });
+    
+    // Écouter tous les boosts utilisateurs pour l'affichage admin
+    db.ref('boosts/users').on('value', snap => {
+        state.userBoosts = snap.val() || {};
+    });
+    
+    // Écouter tous les bans pour l'affichage admin
+    db.ref('bans').on('value', snap => {
+        state.activeBans = snap.val() || {};
     });
 
     db.ref(`bans/${state.user.uid}`).on('value', snap => {
@@ -1030,11 +3004,35 @@ function renderScoreboard() {
         return (a[1].name || '').localeCompare((b[1].name || ''), 'fr', { sensitivity: 'base' });
     });
     
+    // Compter les joueurs par faction
+    const factionCounts = { 1: 0, 2: 0 };
+    sortedUsers.forEach(([uid, userData]) => {
+        if (userData.faction && factionCounts[userData.faction] !== undefined) {
+            factionCounts[userData.faction]++;
+        }
+    });
+    
     // Vider et reconstruire complètement la liste
     listContainer.innerHTML = '';
     
+    // Ajouter l'en-tête avec les comptes de factions
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'scoreboard-faction-counts';
+    headerDiv.innerHTML = `
+        <div class="faction-count-item tsti1">
+            <span class="faction-count-number">${factionCounts[1]}</span>
+            <span class="faction-count-label">TSTI1</span>
+        </div>
+        <div class="faction-vs">VS</div>
+        <div class="faction-count-item tsti2">
+            <span class="faction-count-number">${factionCounts[2]}</span>
+            <span class="faction-count-label">TSTI2</span>
+        </div>
+    `;
+    listContainer.appendChild(headerDiv);
+    
     if (sortedUsers.length === 0) {
-        listContainer.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">Aucun joueur en ligne</div>';
+        listContainer.innerHTML += '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">Aucun joueur en ligne</div>';
         return;
     }
     
@@ -1046,8 +3044,14 @@ function renderScoreboard() {
         
         const li = document.createElement('div');
         li.className = `scoreboard-item ${factionClass}`;
+        
+        // Vérifier si c'est l'admin
+        const isAdmin = userData.name && userData.name.toLowerCase() === CONFIG.ADMIN_USER;
+        const adminTag = isAdmin ? '<span class="admin-tag">ADMIN</span>' : '';
+        const nameStyle = isAdmin ? 'style="color: #ff0040;"' : '';
+        
         li.innerHTML = `
-            <div class="scoreboard-item-name">${userData.name}</div>
+            <div class="scoreboard-item-name" ${nameStyle}>${adminTag}${userData.name}</div>
             <div class="scoreboard-item-faction ${factionClass}">${factionInfo?.name || '?'}</div>
         `;
         
@@ -1109,9 +3113,37 @@ function calculateScores() {
 }
 
 /* ================= RENDU CANVAS ================= */
-function renderLoop() {
-    drawGame(); updateTimerDisplay(); state.renderLoopId = requestAnimationFrame(renderLoop);
+function updatePixelStats() {
+    const totalPixels = CONFIG.BOARD_SIZE * CONFIG.BOARD_SIZE;
+    const placedPixels = Object.keys(state.boardData).length;
+    const percentage = ((placedPixels / totalPixels) * 100).toFixed(1);
+    
+    const statsText = document.getElementById('pixel-stats-text');
+    if (statsText) {
+        statsText.textContent = `${placedPixels}/${totalPixels} (${percentage}%)`;
+    }
 }
+
+function renderLoop() {
+    // Si inactif, ne pas exécuter le render loop
+    if (state.renderLoopPaused) {
+        state.renderLoopId = requestAnimationFrame(renderLoop);
+        return;
+    }
+    
+    drawGame(); 
+    updateTimerDisplay(); 
+    updateOverlayPosition();
+    updateCooldownProgressBar();
+    renderActiveBoosts();
+    renderActiveBans(); // Ajout de cette ligne
+    renderActiveChatPunishments(); // Ajout de l'affichage des punishments du chat
+    
+    // Pas d'appel à updateChatUI ici car le compteur local gère déjà l'affichage du cooldown
+    
+    state.renderLoopId = requestAnimationFrame(renderLoop);
+}
+
 function drawGame() {
     const ctx = document.getElementById('gameCanvas').getContext('2d');
     const cw = ctx.canvas.width; const ch = ctx.canvas.height;
@@ -1130,6 +3162,26 @@ function drawGame() {
         const [gx, gy] = k.split('_').map(Number);
         ctx.fillStyle = state.boardData[k].c;
         ctx.fillRect(gx * CONFIG.PIXEL_SCALE, gy * CONFIG.PIXEL_SCALE, CONFIG.PIXEL_SCALE+0.5, CONFIG.PIXEL_SCALE+0.5);
+    }
+    
+    // Image overlay (calque)
+    if (state.imageOverlay.visible && state.imageOverlay.img) {
+        ctx.save();
+        ctx.globalAlpha = state.imageOverlay.opacity;
+        
+        const img = state.imageOverlay.img;
+        const scaledWidth = img.width * state.imageOverlay.scale;
+        const scaledHeight = img.height * state.imageOverlay.scale;
+        
+        ctx.drawImage(
+            img,
+            state.imageOverlay.x,
+            state.imageOverlay.y,
+            scaledWidth,
+            scaledHeight
+        );
+        
+        ctx.restore();
     }
     
     // FIX: Highlight Hover (Contour Noir Fin sur la case visée)
@@ -1425,13 +3477,7 @@ function setupPalette() {
         const d = document.createElement('div'); d.className = 'color-swatch'; d.style.backgroundColor = c;
         if(c===state.selectedColor) d.classList.add('active');
         d.onclick = () => {
-            state.selectedColor = c;
-            state.userColor = c;
-            // Sauvegarder la couleur dans Firestore
-            firestore.collection('users').doc(state.user.uid).update({
-                selected_color: c
-            }).catch(err => console.warn('Erreur sauvegarde couleur:', err));
-            
+            selectColor(c);
             document.querySelectorAll('.color-swatch').forEach(e=>e.classList.remove('active'));
             d.classList.add('active');
             if(window.innerWidth < 768) document.getElementById('palette-container').classList.add('collapsed-mobile');
@@ -1441,6 +3487,323 @@ function setupPalette() {
     
     // Initialiser le slider d'outils
     setupToolSlider();
+    
+    // Setup import image functionality
+    setupImageImport();
+}
+
+function setupImageImport() {
+    const importBtn = document.getElementById('btn-import-image');
+    const modal = document.getElementById('import-image-modal');
+    const closeBtn = document.getElementById('btn-close-import-image');
+    const fileInput = document.getElementById('file-input');
+    const selectBtn = document.getElementById('btn-select-file');
+    const dropZone = document.getElementById('drop-zone');
+    const urlInput = document.getElementById('image-url');
+    const loadUrlBtn = document.getElementById('btn-load-url');
+    
+    if (!importBtn || !modal) return;
+    
+    // Open modal
+    importBtn.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+        // Tenter d'initialiser les contrôles overlay maintenant
+        setupOverlayControls();
+    });
+    
+    // Close modal
+    closeBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+    
+    // File selection
+    selectBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            loadImageFile(file);
+        }
+    });
+    
+    // Drag & drop
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            loadImageFile(file);
+        }
+    });
+    
+    // URL loading
+    loadUrlBtn.addEventListener('click', () => {
+        const url = urlInput.value.trim();
+        if (url) {
+            loadImageFromUrl(url);
+        }
+    });
+    
+    urlInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const url = urlInput.value.trim();
+            if (url) {
+                loadImageFromUrl(url);
+            }
+        }
+    });
+}
+
+function setupOverlayControls() {
+    const overlayControls = document.getElementById('image-overlay-controls');
+    const moveBtn = document.getElementById('btn-move-image');
+    const settingsBtn = document.getElementById('btn-opacity-settings');
+    const resizeBtn = document.getElementById('btn-resize-image');
+    const deleteBtn = document.getElementById('btn-delete-image');
+    const resizeHandle = document.getElementById('resize-handle');
+    const moveHandle = document.getElementById('move-handle');
+    const opacityHandle = document.getElementById('opacity-handle');
+    const opacityPopup = document.getElementById('opacity-popup');
+    const opacitySlider = document.getElementById('opacity-slider-popup');
+    const opacityValue = document.getElementById('opacity-value-popup');
+    
+    // Vérifier si tous les éléments existent avant de continuer
+    if (!overlayControls || !moveBtn || !settingsBtn || !resizeBtn || !deleteBtn || !resizeHandle || !moveHandle || !opacityHandle || !opacityPopup || !opacitySlider || !opacityValue) {
+        console.log('Éléments de contrôle overlay non encore disponibles, initialisation différée');
+        return;
+    }
+    
+    let isMoving = false;
+    let isResizing = false;
+    let isAdjustingOpacity = false;
+    let startX, startY;
+    
+    // Bouton de déplacement (haut)
+    moveBtn.addEventListener('mousedown', (e) => {
+        isMoving = true;
+        startX = e.clientX - state.imageOverlay.x;
+        startY = e.clientY - state.imageOverlay.y;
+        e.preventDefault();
+    });
+    
+    // Curseur de déplacement (bas centre)
+    moveHandle.addEventListener('mousedown', (e) => {
+        isMoving = true;
+        startX = e.clientX - state.imageOverlay.x;
+        startY = e.clientY - state.imageOverlay.y;
+        e.preventDefault();
+    });
+    
+    // Bouton de redimensionnement
+    resizeBtn.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        e.preventDefault();
+    });
+    
+    // Curseur de taille (coin bas droit)
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        e.preventDefault();
+    });
+    
+    // Curseur de transparence (coin bas gauche)
+    opacityHandle.addEventListener('mousedown', (e) => {
+        isAdjustingOpacity = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        e.preventDefault();
+    });
+    
+    // Bouton de paramètres (transparence)
+    settingsBtn.addEventListener('click', () => {
+        opacityPopup.classList.toggle('hidden');
+        opacitySlider.value = state.imageOverlay.opacity * 100;
+        opacityValue.textContent = `${Math.round(state.imageOverlay.opacity * 100)}%`;
+    });
+    
+    // Slider de transparence
+    opacitySlider.addEventListener('input', (e) => {
+        const value = e.target.value;
+        opacityValue.textContent = `${value}%`;
+        state.imageOverlay.opacity = value / 100;
+    });
+    
+    // Bouton de suppression
+    deleteBtn.addEventListener('click', () => {
+        state.imageOverlay.img = null;
+        state.imageOverlay.visible = false;
+        overlayControls.classList.add('hidden');
+        opacityPopup.classList.add('hidden');
+        showToast('Image supprimée', 'info');
+    });
+    
+    // Événements globaux pour déplacement, redimensionnement et transparence
+    document.addEventListener('mousemove', (e) => {
+        if (isMoving) {
+            state.imageOverlay.x = e.clientX - startX;
+            state.imageOverlay.y = e.clientY - startY;
+            updateOverlayPosition();
+        }
+        
+        if (isResizing) {
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            const delta = Math.max(deltaX, deltaY);
+            // Sensibilité réduite pour le redimensionnement
+            const newScale = Math.max(0.1, Math.min(3, state.imageOverlay.scale + delta / 500));
+            state.imageOverlay.scale = newScale;
+            startX = e.clientX;
+            startY = e.clientY;
+            updateOverlayPosition();
+        }
+        
+        if (isAdjustingOpacity) {
+            const deltaX = e.clientX - startX;
+            // Sensibilité réduite pour la transparence
+            const delta = deltaX / 500;
+            const newOpacity = Math.max(0, Math.min(1, state.imageOverlay.opacity + delta));
+            state.imageOverlay.opacity = newOpacity;
+            startX = e.clientX;
+            
+            // Mettre à jour le slider si le popup est ouvert
+            if (!opacityPopup.classList.contains('hidden')) {
+                opacitySlider.value = newOpacity * 100;
+                opacityValue.textContent = `${Math.round(newOpacity * 100)}%`;
+            }
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isMoving = false;
+        isResizing = false;
+        isAdjustingOpacity = false;
+    });
+    
+    // Fermer popup de transparence en cliquant ailleurs
+    document.addEventListener('click', (e) => {
+        if (!opacityPopup.contains(e.target) && e.target !== settingsBtn) {
+            opacityPopup.classList.add('hidden');
+        }
+    });
+}
+
+function updateOverlayPosition() {
+    const overlayControls = document.getElementById('image-overlay-controls');
+    if (!overlayControls) return;
+    
+    if (!state.imageOverlay.img || !state.imageOverlay.visible) {
+        overlayControls.classList.add('hidden');
+        return;
+    }
+    
+    overlayControls.classList.remove('hidden');
+    
+    const img = state.imageOverlay.img;
+    const scaledWidth = img.width * state.imageOverlay.scale;
+    const scaledHeight = img.height * state.imageOverlay.scale;
+    
+    // Convertir les coordonnées monde en coordonnées écran
+    const canvas = document.getElementById('gameCanvas');
+    if (!canvas) return;
+    
+    const screenX = (state.imageOverlay.x - state.camera.x) * state.camera.zoom + canvas.width / 2;
+    const screenY = (state.imageOverlay.y - state.camera.y) * state.camera.zoom + canvas.height / 2;
+    const screenWidth = scaledWidth * state.camera.zoom;
+    const screenHeight = scaledHeight * state.camera.zoom;
+    
+    overlayControls.style.left = `${screenX}px`;
+    overlayControls.style.top = `${screenY}px`;
+    overlayControls.style.width = `${screenWidth}px`;
+    overlayControls.style.height = `${screenHeight}px`;
+}
+
+function loadImageFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            state.imageOverlay.img = img;
+            state.imageOverlay.visible = true;
+            
+            // Centrer l'image sur la vue actuelle
+            const canvas = document.getElementById('gameCanvas');
+            const centerX = canvas.width / 2 - (img.width * state.imageOverlay.scale) / 2;
+            const centerY = canvas.height / 2 - (img.height * state.imageOverlay.scale) / 2;
+            
+            // Convertir en coordonnées monde
+            state.imageOverlay.x = centerX / state.camera.zoom + state.camera.x;
+            state.imageOverlay.y = centerY / state.camera.zoom + state.camera.y;
+            
+            document.getElementById('import-image-modal').classList.add('hidden');
+            
+            const overlayControls = document.getElementById('image-overlay-controls');
+            if (overlayControls) {
+                overlayControls.classList.remove('hidden');
+            }
+            
+            // Initialiser les contrôles overlay si ce n'est pas déjà fait
+            setupOverlayControls();
+            
+            updateOverlayPosition();
+            showToast('Image chargée avec succès', 'success');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function loadImageFromUrl(url) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+        state.imageOverlay.img = img;
+        state.imageOverlay.visible = true;
+        
+        // Centrer l'image sur la vue actuelle
+        const canvas = document.getElementById('gameCanvas');
+        const centerX = canvas.width / 2 - (img.width * state.imageOverlay.scale) / 2;
+        const centerY = canvas.height / 2 - (img.height * state.imageOverlay.scale) / 2;
+        
+        // Convertir en coordonnées monde
+        state.imageOverlay.x = centerX / state.camera.zoom + state.camera.x;
+        state.imageOverlay.y = centerY / state.camera.zoom + state.camera.y;
+        
+        document.getElementById('import-image-modal').classList.add('hidden');
+        
+        const overlayControls = document.getElementById('image-overlay-controls');
+        if (overlayControls) {
+            overlayControls.classList.remove('hidden');
+        }
+        
+        // Initialiser les contrôles overlay si ce n'est pas déjà fait
+        setupOverlayControls();
+        
+        updateOverlayPosition();
+        showToast('Image chargée avec succès', 'success');
+    };
+    img.onerror = () => {
+        showToast('Erreur lors du chargement de l\'image', 'error');
+    };
+    img.src = url;
 }
 
 function setupToolSlider() {
@@ -1664,10 +4027,37 @@ function updateBoostIndicators() {
     
     // Déterminer quel indicateur afficher
     if (currentCooldown < baseCooldown) {
-        // Cooldown réduit (boost joyeux)
+        // Cooldown réduit (boost joyeux) - différents niveaux selon la durée
+        const cooldownSeconds = Math.ceil(currentCooldown / 1000);
+        let boostText = 'BOOST ACTIF';
+        let boostColor = '#05ffa1'; // vert par défaut
+        
+        // Supprimer toutes les classes d'animation précédentes
+        boostReduced.classList.remove('boost-small', 'boost-normal', 'boost-super', 'boost-ultra');
+        
+        if (cooldownSeconds >= 45 && cooldownSeconds <= 59) {
+            boostText = 'PETIT BOOST ACTIF';
+            boostColor = '#05ffa1'; // vert
+            boostReduced.classList.add('boost-small');
+        } else if (cooldownSeconds >= 30 && cooldownSeconds <= 44) {
+            boostText = 'BOOST ACTIF';
+            boostColor = '#00BCD4'; // bleu
+            boostReduced.classList.add('boost-normal');
+        } else if (cooldownSeconds >= 15 && cooldownSeconds <= 29) {
+            boostText = 'SUPER BOOST ACTIF';
+            boostColor = '#9C27B0'; // violet
+            boostReduced.classList.add('boost-super');
+        } else if (cooldownSeconds >= 1 && cooldownSeconds <= 14) {
+            boostText = 'ULTRA BOOST ACTIF';
+            boostColor = '#FF4757'; // rouge
+            boostReduced.classList.add('boost-ultra');
+        }
+        
         boostReduced.classList.remove('hidden');
-        boostReduced.querySelector('.boost-text').textContent = 
-            `BOOST ACTIF`;
+        const boostTextElement = boostReduced.querySelector('.boost-text');
+        boostTextElement.textContent = boostText;
+        boostTextElement.style.color = boostColor;
+        
     } else if (currentCooldown > baseCooldown) {
         // Cooldown augmenté (moins joyeux)
         boostIncreased.classList.remove('hidden');
@@ -1680,7 +4070,14 @@ async function loadPublicConfigOnce() {
     if (state.publicConfigLoaded) return;
     state.publicConfigLoaded = true;
     try {
-        const doc = await firestore.collection('config').doc('public').get();
+        // Ajouter un timeout pour éviter le blocage
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout loading public config')), 5000);
+        });
+        
+        const docPromise = firestore.collection('config').doc('public').get();
+        const doc = await Promise.race([docPromise, timeoutPromise]);
+        
         if (!doc.exists) return;
         const data = doc.data() || {};
         state.serverSiteVersion = data.site_version || null;
@@ -1695,11 +4092,90 @@ async function loadPublicConfigOnce() {
                 const contentEl = document.getElementById('announcement-content');
                 if (titleEl) titleEl.textContent = title;
                 if (contentEl) contentEl.textContent = content;
-                if (banner) banner.classList.remove('hidden');
+                if (banner) {
+                    banner.classList.remove('hidden');
+                    
+                    // Initialiser l'animation de progression sur le bouton de fermeture
+                    startAnnouncementCountdown(10000); // 10 secondes
+                }
             }
         }
     } catch (e) {
         console.warn('Public config unavailable');
+    }
+}
+
+function startAnnouncementCountdown(duration) {
+    const banner = document.getElementById('announcement-banner');
+    if (!banner) return;
+    
+    // Créer la barre de progression en haut du bandeau
+    let progressBar = banner.querySelector('.announcement-progress-bar');
+    if (!progressBar) {
+        progressBar = document.createElement('div');
+        progressBar.className = 'announcement-progress-bar';
+        progressBar.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 2px;
+            width: 100%;
+            background: #ff6b6b;
+            transform-origin: left;
+            transform: scaleX(1);
+            z-index: 10;
+            will-change: transform;
+        `;
+        banner.appendChild(progressBar);
+    }
+    
+    const startTime = Date.now();
+    let animationId = null;
+    
+    const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const scale = 1 - progress;
+        
+        // Utiliser transform3d pour GPU acceleration
+        progressBar.style.transform = `scale3d(${scale}, 1, 1)`;
+        
+        if (progress < 1 && !banner.classList.contains('hidden')) {
+            animationId = requestAnimationFrame(animate);
+        } else {
+            // Fermer l'annonce quand le temps est écoulé
+            if (!banner.classList.contains('hidden')) {
+                banner.classList.add('hidden');
+            }
+            // Supprimer la barre de progression
+            if (progressBar.parentNode) {
+                progressBar.remove();
+            }
+            // Nettoyer le will-change
+            progressBar.style.willChange = 'auto';
+        }
+    };
+    
+    // Démarrer l'animation immédiatement
+    animationId = requestAnimationFrame(animate);
+    
+    // Arrêter l'animation si l'annonce est fermée manuellement
+    const stopAnimation = () => {
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+        if (progressBar.parentNode) {
+            progressBar.remove();
+        }
+        if (progressBar) {
+            progressBar.style.willChange = 'auto';
+        }
+    };
+    
+    const closeBtn = document.getElementById('btn-close-announcement');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', stopAnimation, { once: true });
     }
 }
 
@@ -1733,10 +4209,24 @@ function forceReloadNoCache() {
     }
 }
 function showToast(msg, type='info') {
-    const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
-    if(type==='error') el.style.borderLeftColor = '#ff4757'; else if(type==='success') el.style.borderLeftColor = '#2ed573';
-    document.getElementById('toast-container').appendChild(el);
-    setTimeout(() => { el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, 3000);
+    const el = document.createElement('div'); 
+    el.className = 'toast'; 
+    el.textContent = msg;
+    
+    if(type==='error') el.style.borderLeftColor = '#ff4757'; 
+    else if(type==='success') el.style.borderLeftColor = '#2ed573';
+    
+    const container = document.getElementById('toast-container');
+    if (container) {
+        container.appendChild(el);
+        setTimeout(() => { 
+            el.style.opacity='0'; 
+            setTimeout(()=>el.remove(),300); 
+        }, 3000);
+    } else {
+        // Fallback: afficher dans la console si le conteneur n'existe pas
+        console.warn(`Toast (${type}): ${msg}`);
+    }
 }
 function showAuthError(id, msg) {
     const el = document.getElementById(id); el.textContent = msg; el.classList.remove('hidden');
@@ -1768,12 +4258,18 @@ function initAudio() {
 
 function playSound(type) {
     if (!audioCtx) {
-        initAudio();
-        if (!audioCtx) return; // Toujours pas d'audio
+        // Ne pas initialiser l'audio automatiquement à cause des restrictions autoplay
+        // Attendre une interaction utilisateur pour initialiser
+        return;
     }
     
     try {
-        if(audioCtx.state === 'suspended') audioCtx.resume();
+        if(audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {
+                // Si ça échoue, on abandonne le son pour cette fois
+                return;
+            });
+        }
         
         if(type === 'pop' && popSnd) { 
             popSnd.currentTime = 0; 
@@ -1791,7 +4287,71 @@ function playSound(type) {
             o.stop(audioCtx.currentTime + 0.1);
         }
     } catch (err) {
-        console.warn('Erreur playSound:', err);
+        // Silencieux - pas d'erreur dans la console pour l'audio
     }
+} // Ajout de l'accolade manquante
 
+// Initialisation simple
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🔍 DEBUG: DOMContentLoaded fired');
+    
+    // S'assurer que Firebase est initialisé
+    initFirebase();
+    
+    // Attendre un peu que Firebase soit prêt si nécessaire
+    const setupAuthListener = () => {
+        console.log('🔍 DEBUG: Setting up auth listener...');
+        console.log('🔍 DEBUG: auth type:', typeof auth);
+        console.log('🔍 DEBUG: auth.onAuthStateChanged type:', typeof auth?.onAuthStateChanged);
+        
+        if (auth && typeof auth.onAuthStateChanged === 'function') {
+            console.log('🔍 DEBUG: Adding auth state listener...');
+            auth.onAuthStateChanged(handleAuthState);
+            console.log('🔍 DEBUG: Auth listener added successfully');
+        } else {
+            console.error('❌ DEBUG: Firebase auth not ready, retrying in 500ms...');
+            setTimeout(setupAuthListener, 500);
+        }
+    };
+    
+    // Démarrer l'authentification
+    setupAuthListener();
+    
+    // Initialiser l'interface
+    setupAuthUI();
+    setupAdminListeners();
+    setupGlobalUiListeners();
+    setupAdminTabs();
+});
+
+// Si le DOM est déjà chargé
+if (document.readyState !== 'loading') {
+    console.log('🔍 DEBUG: DOM already loaded, initializing immediately');
+    
+    initFirebase();
+    
+    // Attendre un peu que Firebase soit prêt si nécessaire
+    const setupAuthListenerImmediate = () => {
+        console.log('🔍 DEBUG: Setting up auth listener (immediate)...');
+        console.log('🔍 DEBUG: auth type:', typeof auth);
+        console.log('🔍 DEBUG: auth.onAuthStateChanged type:', typeof auth?.onAuthStateChanged);
+        
+        if (auth && typeof auth.onAuthStateChanged === 'function') {
+            console.log('🔍 DEBUG: Adding auth state listener...');
+            auth.onAuthStateChanged(handleAuthState);
+            console.log('🔍 DEBUG: Auth listener added successfully');
+        } else {
+            console.error('❌ DEBUG: Firebase auth not ready, retrying in 500ms...');
+            setTimeout(setupAuthListenerImmediate, 500);
+        }
+    };
+    
+    // Démarrer l'authentification
+    setupAuthListenerImmediate();
+    
+    // Initialiser l'interface
+    setupAuthUI();
+    setupAdminListeners();
+    setupGlobalUiListeners();
+    setupAdminTabs();
 }

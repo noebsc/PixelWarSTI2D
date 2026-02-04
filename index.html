@@ -139,15 +139,17 @@
 
         <!-- HUD HAUT -->
         <div class="hud-top glass-panel">
-            <div class="faction-score">
-                <div class="score-bar-container">
-                    <div id="bar-tsti1" class="score-fill tsti1" style="width: 50%"></div>
-                    <div id="bar-tsti2" class="score-fill tsti2" style="width: 50%"></div>
-                </div>
-                <div class="score-numbers">
-                    <span class="t1">TSTI1: <span id="score-tsti1">0</span></span>
-                    <span class="vs">VS</span>
-                    <span class="t2">TSTI2: <span id="score-tsti2">0</span></span>
+            <div class="hud-top-left">
+                <div class="faction-score">
+                    <div class="score-bar-container">
+                        <div id="bar-tsti1" class="score-fill tsti1" style="width: 50%"></div>
+                        <div id="bar-tsti2" class="score-fill tsti2" style="width: 50%"></div>
+                    </div>
+                    <div class="score-numbers">
+                        <span class="t1">TSTI1: <span id="score-tsti1">0</span></span>
+                        <span class="vs">VS</span>
+                        <span class="t2">TSTI2: <span id="score-tsti2">0</span></span>
+                    </div>
                 </div>
             </div>
             
@@ -192,7 +194,7 @@
         <!-- SCOREBOARD (Affichage avec Tab) -->
         <div id="scoreboard-container" class="glass-panel scoreboard hidden">
             <div class="scoreboard-header">
-                <h3>CLASSEMENT EN LIGNE</h3>
+                <h3>Joueurs en ligne</h3>
                 <small>(Maintenez Tab pour afficher)</small>
             </div>
             <div class="scoreboard-list" id="scoreboard-list">
@@ -210,11 +212,16 @@
                     <i class="ph ph-paint-brush"></i>
                 </div>
                 <div class="tool-option" data-tool="pipette">
-                    <i class="ph ph-cursor"></i>
+                    <i class="ph ph-eyedropper"></i>
                 </div>
             </div>
             
             <div class="palette-grid" id="color-grid"></div>
+            
+            <!-- Bouton d'import d'image -->
+            <button id="btn-import-image" class="btn-import-image" title="Importer une image comme calque">
+                <i class="ph ph-image"></i>
+            </button>
         </div>
 
         <!-- CANVAS -->
@@ -224,18 +231,188 @@
 
         <!-- WELCOME POP-UP (déverrouille la carte et musique) -->
         <div id="welcome-popup" class="modal-overlay hidden">
-            <div class="modal-card glass-panel" style="max-width: 350px; text-align: center;">
-                <h1 style="font-family: var(--font-pixel); font-size: 1.5rem; margin-bottom: 10px; background: linear-gradient(90deg, var(--color-tsti1), #fff, var(--color-tsti2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">PIXEL WAR</h1>
-                <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem;">Bienvenue sur la bataille TSTI1 vs TSTI2 !</p>
-                <button id="btn-welcome-start" class="btn-primary" style="width: 100%;">
-                    <span class="btn-text">Accéder à la carte</span>
-                    <i class="ph ph-arrow-right"></i>
-                </button>
+            <div class="welcome-card glass-panel" style="max-width: 380px; text-align: center; padding: 35px; min-height: 280px; display: flex; flex-direction: column; justify-content: center;">
+                <div class="welcome-content">
+                    <h1 style="font-family: var(--font-pixel); font-size: 1.5rem; margin-bottom: 10px; background: linear-gradient(90deg, var(--color-tsti1), #fff, var(--color-tsti2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">PIXEL WAR</h1>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem;">Bienvenue sur la bataille TSTI1 vs TSTI2 !</p>
+                    <button id="btn-welcome-start" class="btn-primary" style="width: 100%;">
+                        <span class="btn-text">Accéder à la carte</span>
+                        <i class="ph ph-arrow-right"></i>
+                    </button>
+                    <p style="color: var(--text-secondary); margin-top: 15px; font-size: 0.75rem; text-align: center; opacity: 0.8;">
+                        En accédant à la carte, vous acceptez les <a href="#" onclick="document.getElementById('rules-toggle-btn').click(); return false;" style="color: var(--color-tsti1); text-decoration: underline;">conditions d'utilisation</a> et la réglementation du jeu
+                    </p>
+                </div>
             </div>
         </div>
+    </div>
 
-        <!-- TOASTS -->
-        <div id="toast-container"></div>
+    <!-- Chat Button -->
+    <button id="chat-toggle-btn" class="chat-toggle-btn">
+        <i class="ph ph-chat-circle-dots"></i>
+        <div id="chat-notification" class="chat-notification hidden"></div>
+    </button>
+
+    <!-- Rules Button -->
+    <button id="rules-toggle-btn" class="rules-toggle-btn" title="Règles">
+        <i class="ph ph-book-open"></i>
+    </button>
+
+    <!-- Chat Window -->
+    <div id="chat-window" class="chat-window hidden">
+        <div class="chat-header">
+            <h3>Discussion</h3>
+            <button id="chat-close-btn" class="chat-close-btn">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-loading">Chargement des messages...</div>
+        </div>
+        <div class="chat-cooldown-display" id="chat-cooldown-display"></div>
+        <div class="chat-input-container">
+            <input type="text" id="chat-input" placeholder="Écrire un message..." maxlength="200">
+            <button id="chat-send-btn" class="chat-send-btn">
+                Envoyer
+            </button>
+        </div>
+        <div class="chat-status-display" id="chat-status-display"></div>
+    </div>
+
+    <!-- BARRE DE PROGRESSION COOLDOWN -->
+    <div id="cooldown-progress-bar" class="cooldown-progress-bar">
+        <div class="cooldown-progress-fill"></div>
+    </div>
+    
+    <!-- INDICATEUR ADMIN ACTIF -->
+    <div id="admin-indicator" class="admin-indicator hidden">
+        Admin actif
+    </div>
+
+    <!-- CONTROLES D'IMAGE OVERLAY -->
+    <div id="image-overlay-controls" class="image-overlay-controls hidden">
+        <!-- Tous les boutons en haut à droite -->
+        <div class="image-controls-top">
+            <button id="btn-move-image" class="image-control-btn move-btn" title="Maintenez pour déplacer">
+                <i class="ph ph-arrows-out"></i>
+            </button>
+            <button id="btn-opacity-settings" class="image-control-btn settings-btn" title="Transparence">
+                <i class="ph ph-sliders"></i>
+            </button>
+            <button id="btn-resize-image" class="image-control-btn resize-btn" title="Maintenez pour redimensionner">
+                <i class="ph ph-arrows-in"></i>
+            </button>
+            <button id="btn-delete-image" class="image-control-btn delete-btn" title="Supprimer">
+                <i class="ph ph-trash"></i>
+            </button>
+        </div>
+        
+        <!-- Curseur de déplacement (coin bas centre) -->
+        <div class="move-handle" id="move-handle" title="Maintenez pour déplacer">
+            <i class="ph ph-arrows-out"></i>
+        </div>
+        
+        <!-- Curseur de taille (coin bas droit) -->
+        <div class="resize-handle" id="resize-handle" title="Maintenez pour redimensionner">
+            <i class="ph ph-arrows-out-simple"></i>
+        </div>
+        
+        <!-- Curseur de transparence (coin bas gauche) -->
+        <div class="opacity-handle" id="opacity-handle" title="Maintenez pour régler la transparence">
+            <i class="ph ph-eye"></i>
+        </div>
+        
+        <!-- Popup de transparence -->
+        <div id="opacity-popup" class="opacity-popup hidden">
+            <div class="opacity-popup-content">
+                <label>Transparence</label>
+                <input type="range" id="opacity-slider-popup" min="0" max="100" value="100">
+                <span id="opacity-value-popup">100%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- 7. IMPORT IMAGE MODAL                     -->
+    <!-- ========================================= -->
+    <div id="import-image-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Importer une image</h2>
+                <button class="btn-close" id="btn-close-import-image"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <div class="import-image-content">
+                <!-- Zone de drag & drop -->
+                <div id="drop-zone" class="drop-zone">
+                    <div class="drop-zone-content">
+                        <i class="ph ph-image" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 10px;"></i>
+                        <p style="color: var(--text-secondary); margin-bottom: 10px;">Glissez-déposez une image ici</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px;">ou</p>
+                        <button id="btn-select-file" class="btn-secondary" style="width: 200px;">
+                            <span class="btn-text">Choisir un fichier</span>
+                            <i class="ph ph-upload"></i>
+                        </button>
+                        <input type="file" id="file-input" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+                
+                <!-- URL input -->
+                <div class="url-input-section" style="margin-top: 20px;">
+                    <label style="display: block; margin-bottom: 8px; color: var(--text-primary);">Ou entrez une URL d'image:</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="url" id="image-url" placeholder="https://example.com/image.png" style="flex: 1; padding: 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; background: rgba(0,0,0,0.3); color: white;">
+                        <button id="btn-load-url" class="btn-primary">
+                            <i class="ph ph-download"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Contrôles de l'image importée -->
+                <div id="image-controls" class="image-controls hidden" style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px; color: var(--text-primary);">Contrôles de l'image</h3>
+                    
+                    <!-- Transparence -->
+                    <div class="control-group">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-primary);">Transparence: <span id="opacity-value">50%</span></label>
+                        <input type="range" id="opacity-slider" min="0" max="100" value="50" style="width: 100%;">
+                    </div>
+                    
+                    <!-- Échelle -->
+                    <div class="control-group" style="margin-top: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-primary);">Échelle: <span id="scale-value">100%</span></label>
+                        <input type="range" id="scale-slider" min="10" max="300" value="100" style="width: 100%;">
+                    </div>
+                    
+                    <!-- Position -->
+                    <div class="control-group" style="margin-top: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-primary);">Position</label>
+                        <div style="display: flex; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.9rem; color: var(--text-secondary);">X:</label>
+                                <input type="number" id="pos-x" value="0" style="width: 100%; padding: 5px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(0,0,0,0.3); color: white;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.9rem; color: var(--text-secondary);">Y:</label>
+                                <input type="number" id="pos-y" value="0" style="width: 100%; padding: 5px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(0,0,0,0.3); color: white;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Boutons d'action -->
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button id="btn-apply-image" class="btn-primary" style="flex: 1;">
+                            <span class="btn-text">Appliquer</span>
+                            <i class="ph ph-check"></i>
+                        </button>
+                        <button id="btn-remove-image" class="btn-secondary" style="background: var(--error); color: white; flex: 1;">
+                            <span class="btn-text">Supprimer</span>
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ========================================= -->
@@ -278,6 +455,8 @@
                     <button class="admin-nav-item" data-admin-tab="admin-tab-version">Version</button>
                     <button class="admin-nav-item" data-admin-tab="admin-tab-boosts">Boosts</button>
                     <button class="admin-nav-item" data-admin-tab="admin-tab-bans">Bans</button>
+                    <button class="admin-nav-item" data-admin-tab="admin-tab-chat">Chat</button>
+                    <button class="admin-nav-item" data-admin-tab="admin-tab-chat-announcement">Annonce chat</button>
                 </div>
 
                 <div class="admin-main">
@@ -379,7 +558,16 @@
                                 </div>
                                 <div style="display: flex; gap: 10px;">
                                     <button id="btn-admin-apply-boost" class="btn-small" style="flex: 1;">Activer</button>
-                                    <button id="btn-admin-remove-boost" class="btn-small" style="flex: 1; background: var(--error); color: white;">Supprimer</button>
+                                    <button id="btn-admin-remove-boost" class="btn-small" style="flex: 1;">Supprimer</button>
+                                </div>
+                            </div>
+                            
+
+                            <!-- Boosts actifs -->
+                            <div class="active-boosts-list" id="active-boosts-list">
+                                <h4>Boosts actifs</h4>
+                                <div id="active-boosts-content">
+                                    <!-- Rempli par JS -->
                                 </div>
                             </div>
                         </div>
@@ -392,6 +580,7 @@
                                 <select id="admin-ban-target">
                                     <option value="">Choisir un joueur en ligne</option>
                                 </select>
+                                <input type="text" id="admin-ban-offline-name" placeholder="Ou entrer le prénom d'un joueur hors ligne" style="margin-top: 10px;">
                                 <div style="display: flex; gap: 10px;">
                                     <input type="number" id="admin-ban-duration" placeholder="Durée" min="1">
                                     <select id="admin-ban-unit">
@@ -405,6 +594,90 @@
                                     <button id="btn-admin-apply-ban" class="btn-small" style="flex: 1;">Bannir</button>
                                     <button id="btn-admin-remove-ban" class="btn-small" style="flex: 1; background: var(--error); color: white;">Débannir</button>
                                 </div>
+                            </div>
+                            
+                            <!-- Bans actifs -->
+                            <div class="active-bans-list" id="active-bans-list">
+                                <h4>Bans actifs</h4>
+                                <div id="active-bans-content">
+                                    <!-- Rempli par JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab hidden" id="admin-tab-chat">
+                        <div class="admin-section">
+                            <h3>Gestion des infractions</h3>
+                            <div class="add-user-form" style="flex-direction: column; align-items: stretch;">
+                                <select id="admin-infractions-target">
+                                    <option value="">Choisir un joueur en ligne</option>
+                                </select>
+                                <input type="text" id="admin-infractions-offline-name" placeholder="Ou entrer le prénom d'un joueur hors ligne" style="margin-top: 10px;">
+                                <div style="display: flex; gap: 10px;">
+                                    <button id="btn-admin-view-infractions" class="btn-small" style="flex: 1;">Voir infractions</button>
+                                    <button id="btn-admin-reset-infractions" class="btn-small" style="flex: 1; background: var(--warning); color: white;">Reset infractions</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Détails des infractions -->
+                            <div class="infractions-details" id="infractions-details" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; display: none;">
+                                <h4>Infractions de <span id="infractions-user-name"></span></h4>
+                                <div id="infractions-content">
+                                    <!-- Rempli par JS -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="admin-section">
+                            <h3>Mutes et bans du chat</h3>
+                            <div class="add-user-form" style="flex-direction: column; align-items: stretch;">
+                                <select id="admin-chat-target">
+                                    <option value="">Choisir un joueur en ligne</option>
+                                </select>
+                                <input type="text" id="admin-chat-offline-name" placeholder="Ou entrer le prénom d'un joueur hors ligne" style="margin-top: 10px;">
+                                <div style="display: flex; gap: 10px;">
+                                    <select id="admin-chat-action">
+                                        <option value="mute">Mute</option>
+                                        <option value="ban-chat">Ban chat</option>
+                                    </select>
+                                    <input type="number" id="admin-chat-duration" placeholder="Durée" min="1">
+                                    <select id="admin-chat-unit">
+                                        <option value="minutes">Minutes</option>
+                                        <option value="hours">Heures</option>
+                                        <option value="days">Jours</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <button id="btn-admin-apply-chat-punishment" class="btn-small" style="flex: 1;">Appliquer</button>
+                                    <button id="btn-admin-remove-chat-punishment" class="btn-small" style="flex: 1; background: var(--error); color: white;">Retirer</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Mutes et bans actifs -->
+                            <div class="active-chat-punishments-list" id="active-chat-punishments-list">
+                                <h4>Mutes et bans actifs</h4>
+                                <div id="active-chat-punishments-content">
+                                    <!-- Rempli par JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-tab hidden" id="admin-tab-chat-announcement">
+                        <div class="admin-section">
+                            <h3>Annonce Chat Système</h3>
+                            <div class="add-user-form" style="flex-direction: column; align-items: stretch;">
+                                <textarea id="admin-chat-announcement-message" 
+                                    placeholder="Écrire votre annonce ici..." 
+                                    style="width: 100%; min-height: 100px; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; resize: vertical; font-family: var(--font-pixel);"></textarea>
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button id="btn-admin-send-chat-announcement" class="btn-small" style="flex: 1; background: var(--error); color: white;">Envoyer l'annonce</button>
+                                    <button id="btn-admin-clear-chat-announcement" class="btn-small" style="flex: 1; background: var(--warning); color: white;">Effacer</button>
+                                </div>
+                                <p style="margin-top: 10px; font-size: 12px; color: #888; font-style: italic;">
+                                    L'annonce sera envoyée en tant que 'Système' et apparaîtra en rouge dans le chat.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -426,9 +699,11 @@
             measurementId: "G-QRQR1CSBJZ"
         };
         firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.database();
-        const firestore = firebase.firestore();
+        
+        // Rendre les variables Firebase globales pour script.js
+        window.auth = firebase.auth();
+        window.db = firebase.database();
+        window.firestore = firebase.firestore();
     </script>
 
     <script>
@@ -459,6 +734,105 @@
             }
         })();
     </script>
+
+    <!-- Popup d'inactivité -->
+    <div id="inactivity-popup" class="inactivity-popup">
+        <div class="inactivity-content">
+            <div class="inactivity-icon">⏸️</div>
+            <h2>Session en pause</h2>
+            <p id="inactivity-message">Vous avez été inactif.</p>
+            <p>Les requêtes ont été mises en pause pour économiser les ressources.</p>
+            <button class="inactivity-resume-btn" onclick="resumeFromInactivity()">
+                <i class="ph ph-play"></i>
+                Reprendre
+            </button>
+        </div>
+    </div>
+
+    <!-- Popup des règles -->
+    <div id="rules-popup" class="rules-popup">
+        <div class="rules-content">
+            <div class="rules-header">
+                <div class="rules-icon">📖</div>
+                <h2>Règles & Informations</h2>
+                <button class="rules-close-btn" onclick="closeRulesPopup()">
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+            
+            <div class="rules-body">
+                <!-- Règles du jeu -->
+                <section class="rules-section">
+                    <h3><i class="ph ph-game-controller"></i> Règles du Jeu</h3>
+                    <ul class="rules-list">
+                        <li>✅ <strong>Placement autorisé</strong> : Vous pouvez placer des pixels sur les créations des autres</li>
+                        <li>🚫 <strong>Contenu interdit</strong> : Pornographique, NSFW, raciste, haineux, religieux ou discriminatoire</li>
+                        <li>⚠️ <strong>Sanction</strong> : Tout contenu interdit = BAN temporaire ou définitif sans avertissement</li>
+                        <li>🎯 <strong>Objectif</strong> : Dominer la carte en plaçant plus de pixels pour votre faction</li>
+                        <li>⏱️ <strong>Cooldown</strong> : 60 secondes (par défaut) entre chaque placement de pixel</li>
+                    </ul>
+                </section>
+
+                <!-- Chat -->
+                <section class="rules-section">
+                    <h3><i class="ph ph-chat-dots"></i> Règles du Chat</h3>
+                    <ul class="rules-list">
+                        <li>🗣️ <strong>Respect</strong> : Pas d'insultes, de menaces ou de harcèlement</li>
+                        <li>🚫 <strong>Langage</strong> : Pas de gros mots, propos inappropriés ou spam</li>
+                        <li>⚖️ <strong>Modération</strong> : Les admins peuvent supprimer les messages et mute/ban</li>
+                        <li>⏰ <strong>Cooldown</strong> : 10 secondes entre chaque message</li>
+                    </ul>
+                </section>
+
+                <!-- Informations du site -->
+                <section class="rules-section">
+                    <h3><i class="ph ph-info"></i> Informations du Site</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <strong>👨‍💻 Développeur</strong>
+                            <p>Noé - TSTI2D2</p>
+                        </div>
+                        <div class="info-item">
+                            <strong>🔓 Projet</strong>
+                            <p>Open Source</p>
+                        </div>
+                        <div class="info-item">
+                            <strong>🌐 Hébergement</strong>
+                            <p>GitHub Pages</p>
+                        </div>
+                        <div class="info-item">
+                            <strong>🔥 Base de données</strong>
+                            <p>Firebase (Google)</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- RGPD & Confidentialité -->
+                <section class="rules-section">
+                    <h3><i class="ph ph-shield-check"></i> RGPD & Confidentialité</h3>
+                    <ul class="rules-list">
+                        <li>📝 <strong>Données collectées</strong> : Pseudo, mot de passe (hashé), pixels placés</li>
+                        <li>🔒 <strong>Sécurité</strong> : Mots de passe cryptés, connexion sécurisée HTTPS</li>
+                        <li>👤 <strong>Anonymat</strong> : Aucune donnée personnelle sensible requise</li>
+                        <li>🗑️ <strong>Suppression</strong> : Contactez l'admin pour suppression des données</li>
+                        <li>🇪🇺 <strong>Hébergeur</strong> : Google Firebase (conforme RGPD)</li>
+                        <li>Toutes les données sont stockées sur des serveurs Firebase en Europe (France & Belgique)</li>
+                    </ul>
+                </section>
+
+                <!-- Mentions légales -->
+                <section class="rules-section">
+                    <h3><i class="ph ph-certificate"></i> Mentions Légales</h3>
+                    <div class="legal-text">
+                        <p><strong>Propriétaire</strong> : Noé (développeur indépendant)</p>
+                        <p><strong>Finalité</strong> : Jeu éducatif et divertissement pour étudiants STI2D</p>
+                        <p><strong>Hébergement</strong> : GitHub Pages, Inc. (San Francisco, USA)</p>
+                        <p><strong>Contact</strong> : contact@noecyber.fr</p>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 
