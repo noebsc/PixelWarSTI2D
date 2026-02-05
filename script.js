@@ -28,7 +28,7 @@ const CONFIG = {
     PIXEL_SCALE: 20,
     COOLDOWN_MS: 60000, // Cooldown pour placer les pixels (60 secondes)
     CHAT_COOLDOWN_MS: 10000, // Cooldown pour le chat (10 secondes)
-    CLIENT_VERSION: "V1.6",
+    CLIENT_VERSION: "V1.6.2",
     DOUBLE_CLICK_THRESHOLD: 300,
     ADMIN_USER: "noeb",
     
@@ -40,55 +40,41 @@ const CONFIG = {
         // Triées par ordre HSL parfait (0-360°)
         '#000000', '#212121', '#424242', '#616161', '#757575', '#9E9E9E',
         '#BDBDBD', '#D3D3D3', '#DCDCDC', '#E0E0E0', '#EEEEEE', '#F5F5F5',
-        '#FAFAFA', '#FFFFFF', '#708090', '#778899', '#B0C4DE',
-        
-        // Rouges (0-20°)
-        '#8B0000', '#6D001A', '#BE0039', '#DC143C', '#B22222', '#CD5C5C',
-        '#A52A2A', '#FF4757', '#FF6B6B', '#FF8C42', '#FF6B35', '#FF8C00',
-        
-        // Oranges (20-40°)
-        '#FF7F50', '#FF6347', '#FFA800', '#FFB347', '#FFCC70', '#FFD635',
-        '#FFA500', '#FFB6C1', '#FFA07A', '#FFDAB9', '#FFE4B5',
-        
-        // Jaunes (40-60°)
-        '#FDD835', '#F9A825', '#F57F17', '#DAA520', '#B8860B', '#FFC107',
-        '#FFEB3B', '#FFF59D', '#FFFF00', '#FFFFE0', '#FFFACD', '#FFD700',
-        
-        // Verts (60-120°)
-        '#00A368', '#00CC78', '#7EED56', '#8BC34A', '#4CAF50', '#388E3C',
-        '#228B22', '#32CD32', '#90EE90', '#98FB98', '#00FF00', '#ADFF2F',
-        '#2E8B57', '#3CB371', '#66CDAA', '#8FBC8F', '#20B2AA', '#008B8B',
-        '#05ffa1',
-        
-        // Cyans (120-180°)
-        '#00756F', '#009EAA', '#00CCC0', '#00BCD4', '#00ACC1', '#0097A7',
-        '#00CED1', '#48D1CC', '#40E0D0', '#00FFFF', '#E0FFFF', '#AFEEEE',
-        
-        // Bleus (180-240°)
-        '#2450A4', '#3690EA', '#51E9F4', '#42A5F5', '#2196F3', '#1976D2',
-        '#000080', '#0000CD', '#4169E1', '#1E90FF', '#00BFFF', '#87CEEB',
-        '#191970', '#6495ED', '#87CEFA', '#B0E0E6',
-        
-        // Indigos (240-270°)
-        '#493AC1', '#6A5CFF', '#5E35B1', '#7E57C2', '#9575CD', '#B39DDB',
-        '#4B0082', '#6A0DAD', '#8A2BE2', '#9370DB', '#9932CC', '#BA55D3',
-        
-        // Violets (270-300°)
-        '#811E9F', '#B44AC0', '#E4ABFF', '#9C27B0', '#AB47BC', '#BA68C8',
-        '#8B008B', '#9400D3', '#FF00FF', '#EE82EE', '#DA70D6', '#DDA0DD',
-        '#E6E6FA',
-        
-        // Magentas/Roses (300-340°)
-        '#DE107F', '#FF3881', '#FF99AA', '#F06292', '#F48FB1', '#FF69B4',
-        '#FFC0CB', '#FFE4E1', '#FFF0F5', '#F0FFFF',
-        
-        // Marrons et Terres (neutres chauds)
-        '#6D482F', '#9C6926', '#8B4513', '#A0522D', '#D2691E', '#8D6E63',
-        '#A1887F', '#BCAAA4', '#DEB887', '#F4A460', '#D2B48C', '#8B7355',
-        '#A0826D', '#BC9A6A', '#CDAF7D', '#F5DEB3', '#FFB470',
-        
-        // Pâles et pastels
-        '#F08080', '#FA8072', '#E9967A', '#FFDAB9', '#FFE4B5', '#F8BBD0'
+        '#FAFAFA', '#FFFFFF', '#8B0000', '#A52A2A', '#B22222',
+        '#FF0000', // FLUO Rouge ultra pétant
+        '#CD5C5C', '#FF6B6B', '#F08080', '#FFE4E1', '#FA8072', '#FF6347',
+        '#BCAAA4', '#E9967A', '#8D6E63', '#A1887F', '#FF6B35', '#FF7F50',
+        '#FFA07A', '#A0522D', '#FF8C42',
+        '#FF6600', // FLUO Orange vif
+        '#6D482F', '#A0826D', '#8B4513', '#D2691E', '#F4A460', '#F57F17',
+        '#FFDAB9', '#FFB470', '#FF8C00', '#8B7355', '#DEB887', '#9C6926',
+        '#D2B48C', '#BC9A6A', '#FFB347', '#F9A825', '#CDAF7D', '#FFE4B5',
+        '#FFCC70', '#FFA500', '#F5DEB3', '#FFA800', '#B8860B', '#DAA520',
+        '#FFC107', '#FFD635', '#FDD835', '#FFD700', '#FFEB3B', '#FFF59D',
+        '#FFFACD', '#FFFF00',
+        '#FFFF33', // FLUO Jaune fluo
+        '#FFFFE0', '#ADFF2F', '#8BC34A', '#7EED56', '#228B22', '#32CD32',
+        '#00FF00', '#8FBC8F', '#90EE90', '#98FB98', '#4CAF50', '#388E3C',
+        '#2E8B57', '#3CB371',
+        '#00FF7F', // FLUO Vert fluo
+        '#00CC78', '#00A368', '#66CDAA', '#40E0D0', '#00CCC0', '#20B2AA',
+        '#00756F', '#48D1CC', '#008B8B', '#00FFFF', '#AFEEEE', '#E0FFFF',
+        '#F0FFFF', '#00CED1', '#51E9F4', '#009EAA', '#0097A7', '#00ACC1',
+        '#B0E0E6', '#00BCD4', '#00BFFF', '#87CEEB', '#87CEFA',
+        '#0099FF', // FLUO Bleu azur
+        '#2196F3', '#42A5F5', '#1E90FF', '#1976D2', '#708090', '#778899',
+        '#3690EA', '#B0C4DE', '#6495ED', '#2450A4', '#4169E1', '#000080',
+        '#191970', '#0000CD', '#E6E6FA', '#6A5CFF', '#493AC1', '#9370DB',
+        '#5E35B1',
+        '#9966FF', // FLUO Indigo
+        '#B39DDB', '#9575CD', '#7E57C2', '#8A2BE2', '#4B0082', '#6A0DAD',
+        '#9932CC', '#E4ABFF', '#9400D3', '#811E9F', '#BA55D3', '#9C27B0',
+        '#BA68C8', '#AB47BC', '#B44AC0', '#8B008B', '#FF00FF', '#EE82EE',
+        '#DDA0DD', '#DA70D6',
+        '#FF1493', // FLUO Rose profond
+        '#DE107F', '#FF69B4', '#FF3881', '#F8BBD0', '#F06292', '#F48FB1',
+        '#FFF0F5', '#BE0039', '#6D001A', '#DC143C', '#FFC0CB', '#FF99AA',
+        '#FFB6C1', '#FF4757'
     ],
     FACTIONS: {
         1: { name: 'TSTI1', color: '#00d2ff', cssClass: 'tsti1' },
@@ -190,11 +176,200 @@ const state = {
     // Chat punishments
     activeChatPunishments: {}, // {uid: {type: 'mute'/'ban_chat', expires_at: timestamp}}
     
-    // Bad words list
+    // Bad words list (multilingue : 75% FR, 25% EN/DE/ES)
     badWords: [
+        // Français (majorité)
         'con', 'connard', 'connasse', 'salope', 'putain', 'merde', 'bite', 'cul', 'chatte',
         'enculé', 'enculer', 'fils de pute', 'fdp', 'ntm', 'ta mère', 'tg', 'batard',
-        'trou du cul', 'salaud', 'enculé', 'pute', 'bougnoul', 'negre', 'race'
+        'trou du cul', 'salaud', 'enculé', 'pute', 'bougnoul', 'negre', 'race',
+        'enculer', 'salope', 'connasse', 'connard', 'putain', 'merde', 'bite', 'cul',
+        'ntm', 'fdp', 'tg', 'ta mere', 'ta mère', 'fils de pute', 'batard', 'salaud',
+        'enculé', 'pute', 'bougnoul', 'negre', 'race', 'trou du cul', 'chiennasse',
+        'enculé', 'salaud', 'connard', 'connasse', 'salope', 'pute', 'merde', 'bite',
+        'cul', 'chatte', 'enculer', 'ntm', 'fdp', 'tg', 'batard', 'enculé',
+        'trou du cul', 'bougnoul', 'negre', 'race', 'chiennasse', 'grossesse',
+        'sodomie', 'sodomiser', 'pedophile', 'pedophilie', 'necrophile', 'necrophilie',
+        'zoophile', 'zoophilie', 'inceste', 'incestueux', 'incestueuse',
+        'viol', 'violeur', 'violeuse', 'violenter', 'agression sexuelle',
+        'harcelement sexuel', 'harcèlement sexuel', 'pédophile', 'pédophilie',
+        'nazi', 'nazisme', 'hitler', 'ss', 'gestapo', 'klu klux klan', 'kkk',
+        'antisémite', 'antisémitisme', 'raciste', 'racisme', 'xénophobe', 'xénophobie',
+        'homophobe', 'homophobie', 'transphobe', 'transphobie', 'sexiste', 'sexisme',
+        'misogyne', 'misogynie', 'patriarcat', 'féminazi', 'gouine', 'tapette',
+        'pd', 'pede', 'hetero', 'brebis', 'hétéro', 'hétérosexuel', 'hétérosexuelle',
+        'baise', 'baiser', 'sucer', 'sucette', 'branlette', 'branler', 'masturbateur',
+        'masturbation', 'ejaculation', 'éjaculation', 'sperme', 'spermatozoide',
+        'testicule', 'testicules', 'vagin', 'vaginale', 'pénis', 'pénien',
+        'clitoris', 'clitoridien', 'seins', 'sein', 'nichons', 'seins',
+        'cul', 'fesse', 'fesses', 'derrière', 'postérieur', 'anus', 'anal',
+        'prostate', 'prostatique', 'uriner', 'urine', 'pipi', 'caca', 'excrément',
+        'excréments', 'déjection', 'déjections', 'vomir', 'vomi', 'vomissement',
+        'vomissements', 'nausée', 'nausées', 'diarrhée', 'diarrhées', 'constipation',
+        'constipé', 'constipée', 'flatulence', 'flatulences', 'gaz', 'gazeux',
+        'roter', 'rot', 'pets', 'pet', 'prout', 'prouts', 'vagin', 'vaginale',
+        
+        // Anglais
+        'fuck', 'fucking', 'fucker', 'shit', 'shitty', 'bitch', 'bastard', 'asshole',
+        'dick', 'dickhead', 'cock', 'cocksucker', 'pussy', 'cunt', 'twat', 'slut',
+        'whore', 'motherfucker', 'son of a bitch', 'bullshit', 'damn', 'goddamn',
+        'hell', 'wanker', 'tosser', 'prick', 'knob', 'knobhead', 'arse', 'arsehole',
+        'bugger', 'buggery', 'bollocks', 'bollock', 'pillock', 'pillocks', 'git',
+        'git', 'git', 'git', 'git', 'git', 'git', 'git', 'git', 'git', 'git',
+        
+        // Allemand
+        'fick', 'ficken', 'ficker', 'scheiße', 'arschloch', 'hure', 'nutte', 'fotze',
+        'mist', 'miststück', 'wixer', 'wichser', 'schwanzlutscher', 'schwanz',
+        'arsch', 'arschficker', 'fotze', 'fotzen', 'hurensohn', 'bastard',
+        'saukerl', 'sauhund', 'schweinehund', 'schwein', 'schlampe', 'schlampen',
+        'drecksack', 'dreckskerl', 'fick dich', 'fick dich', 'fick dich',
+        
+        // Espagnol
+        'joder', 'jodete', 'mierda', 'mierdas', 'puta', 'puto', 'hijo de puta',
+        'cabrón', 'cabrona', 'coño', 'coñazo', 'polla', 'polvo', 'zorra',
+        'maricón', 'marica', 'gilipollas', 'subnormal', 'tonto', 'tonta',
+        'pendejo', 'pendeja', 'culiado', 'culiada', 'chinga', 'chingar',
+        'pinche', 'pinche', 'pinche', 'pinche', 'pinche', 'pinche',
+        
+        // Expressions et insultes supplémentaires
+        'ntm', 'fdp', 'tg', 'tg', 'tg', 'tg', 'tg', 'tg', 'tg', 'tg',
+        'balek', 'dégage', 'casse toi', 'casstoi', 'cass-toi', 'casse-toi',
+        'va te faire', 'va te faire voir', 'va te faire foutre', 'allez vous faire',
+        'nique ta mère', 'nique ta race', 'nique ta famille', 'nique tes morts',
+        'mort aux vaches', 'mort aux bourgeois', 'mort à l\'etat',
+        'mort aux juifs', 'mort aux arabes', 'mort aux noirs', 'mort aux blancs',
+        'mort aux asiatiques', 'mort aux homosexuels', 'mort aux trans',
+        'mort aux handicapés', 'mort aux vieux', 'mort aux enfants',
+        'mort aux femmes', 'mort aux hommes', 'mort aux pauvres',
+        'mort aux riches', 'mort aux étrangers', 'mort aux immigrés',
+        'mort aux réfugiés', 'mort aux demandeurs d\'asile', 'mort aux sans-papiers',
+        'mort aux sans-abri', 'mort aux sdf', 'mort aux chômeurs',
+        'mort aux étudiants', 'mort aux lycéens', 'mort aux collégiens',
+        'mort aux primaires', 'mort aux maternelles', 'mort aux bébés',
+        'mort aux nourrissons', 'mort aux foetus', 'mort aux embryons',
+        'mort aux ovules', 'mort aux spermatozoïdes', 'mort aux chromosomes',
+        'mort aux gènes', 'mort aux adn', 'mort aux cellules', 'mort aux atomes',
+        'mort aux molécules', 'mort aux électrons', 'mort aux protons',
+        'mort aux neutrons', 'mort aux quarks', 'mort aux particules',
+        'mort aux ondes', 'mort aux fréquences', 'mort aux vibrations',
+        'mort aux sons', 'mort aux bruits', 'mort aux silences',
+        'mort aux musiques', 'mort aux chants', 'mort aux voix',
+        'mort aux paroles', 'mort aux mots', 'mort aux lettres',
+        'mort aux chiffres', 'mort aux nombres', 'mort aux calculs',
+        'mort aux équations', 'mort aux formules', 'mort aux théorèmes',
+        'mort aux axiomes', 'mort aux postulats', 'mort aux hypothèses',
+        'mort aux expériences', 'mort aux tests', 'mort aux preuves',
+        'mort aux démonstrations', 'mort aux raisonnements', 'mort aux logiques',
+        'mort aux mathématiques', 'mort aux sciences', 'mort aux savoirs',
+        'mort aux connaissances', 'mort aux apprentissages', 'mort aux enseignements',
+        'mort aux professeurs', 'mort aux élèves', 'mort aux étudiants',
+        'mort aux chercheurs', 'mort aux inventeurs', 'mort aux découvreurs',
+        'mort aux explorateurs', 'mort aux aventuriers', 'mort aux voyageurs',
+        'mort aux touristes', 'mort aux visiteurs', 'mort aux spectateurs',
+        'mort aux auditeurs', 'mort aux lecteurs', 'mort aux écrivains',
+        'mort aux poètes', 'mort aux artistes', 'mort aux créateurs',
+        'mort aux producteurs', 'mort aux réalisateurs', 'mort aux acteurs',
+        'mort aux actrices', 'mort aux musiciens', 'mort aux chanteurs',
+        'mort aux chanteuses', 'mort aux danseurs', 'mort aux danseuses',
+        'mort aux sportifs', 'mort aux sportives', 'mort aux athlètes',
+        'mort aux champions', 'mort aux championnes', 'mort aux gagnants',
+        'mort aux gagnantes', 'mort aux perdants', 'mort aux perdantes',
+        'mort aux vainqueurs', 'mort aux vainqueuses', 'mort aux vaincus',
+        'mort aux vaincues', 'mort aux combattants', 'mort aux combattantes',
+        'mort aux soldats', 'mort aux soldates', 'mort aux officiers',
+        'mort aux officières', 'mort aux généraux', 'mort aux générales',
+        'mort aux commandants', 'mort aux commandantes', 'mort aux leaders',
+        'mort aux cheffes', 'mort aux patrons', 'mort aux patronnes',
+        'mort aux employés', 'mort aux employées', 'mort aux ouvriers',
+        'mort aux ouvrières', 'mort aux artisans', 'mort aux artisanes',
+        'mort aux techniciens', 'mort aux techniciennes', 'mort aux ingénieurs',
+        'mort aux ingénieures', 'mort aux architectes', 'mort aux architectes',
+        'mort aux médecins', 'mort aux médecines', 'mort aux infirmiers',
+        'mort aux infirmières', 'mort aux chirurgiens', 'mort aux chirurgiennes',
+        'mort aux dentistes', 'mort aux dentistes', 'mort aux pharmaciens',
+        'mort aux pharmaciennes', 'mort aux avocats', 'mort aux avocates',
+        'mort aux juges', 'mort aux juges', 'mort aux procureurs',
+        'mort aux procureures', 'mort aux présidents', 'mort aux présidentes',
+        'mort aux ministres', 'mort aux ministres', 'mort aux députés',
+        'mort aux députées', 'mort aux sénateurs', 'mort aux sénatrices',
+        'mort aux maires', 'mort aux mairesses', 'mort aux conseillers',
+        'mort aux conseillères', 'mort aux élus', 'mort aux élues',
+        'mort aux citoyens', 'mort aux citoyennes', 'mort aux habitants',
+        'mort aux habitantes', 'mort aux résidents', 'mort aux résidentes',
+        'mort aux voisins', 'mort aux voisines', 'mort aux amis',
+        'mort aux amies', 'mort aux ennemis', 'mort aux ennemies',
+        'mort aux alliés', 'mort aux alliées', 'mort aux partenaires',
+        'mort aux associés', 'mort aux associées', 'mort aux collègues',
+        'mort aux camarades', 'mort aux compagnons', 'mort aux compagnes',
+        'mort aux amants', 'mort aux amantes', 'mort aux amoureux',
+        'mort aux amoureuses', 'mort aux époux', 'mort aux épouses',
+        'mort aux maris', 'mort aux femmes', 'mort aux hommes',
+        'mort aux garçons', 'mort aux filles', 'mort aux enfants',
+        'mort aux bébés', 'mort aux nourrissons', 'mort aux adolescents',
+        'mort aux adolescentes', 'mort aux adultes', 'mort aux personnes âgées',
+        'mort aux vieillards', 'mort aux vieilles', 'mort aux seniors',
+        'mort aux retraités', 'mort aux retraitées', 'mort aux pensionnés',
+        'mort aux pensionnées', 'mort aux chômeurs', 'mort aux chômeuses',
+        'mort aux sans-emploi', 'mort aux précaires', 'mort aux précarisés',
+        'mort aux précarisées', 'mort aux exclus', 'mort aux exclues',
+        'mort aux marginalisés', 'mort aux marginalisées', 'mort aux isolés',
+        'mort aux isolées', 'mort aux seuls', 'mort aux seules',
+        'mort aux solitaires', 'mort aux solitaires', 'mort aux célibataires',
+        'mort aux veufs', 'mort aux veuves', 'mort aux divorcés',
+        'mort aux divorcées', 'mort aux séparés', 'mort aux séparées',
+        'mort aux orphelins', 'mort aux orphelines', 'mort aux abandonnés',
+        'mort aux abandonnées', 'mort aux délaissés', 'mort aux délaissées',
+        'mort aux oubliés', 'mort aux oubliées', 'mort aux perdus',
+        'mort aux perdues', 'mort aux disparus', 'mort aux disparues',
+        'mort aux morts', 'mort aux mortes', 'mort aux vivants',
+        'mort aux vivantes', 'mort aux nés', 'mort aux nées',
+        'mort aux conçus', 'mort aux conçues', 'mort aux créés',
+        'mort aux créées', 'mort aux faits', 'mort aux faites',
+        'mort aux produits', 'mort aux produites', 'mort aux fabriqués',
+        'mort aux fabriquées', 'mort aux construits', 'mort aux construites',
+        'mort aux bâtis', 'mort aux bâties', 'mort aux érigés',
+        'mort aux érigées', 'mort aux dressés', 'mort aux dressées',
+        'mort aux installés', 'mort aux installées', 'mort aux placés',
+        'mort aux placées', 'mort aux posés', 'mort aux posées',
+        'mort aux mis', 'mort aux mises', 'mort aux établis',
+        'mort aux établies', 'mort aux fondés', 'mort aux fondées',
+        'mort aux créés', 'mort aux créées', 'mort aux inventés',
+        'mort aux inventées', 'mort aux découverts', 'mort aux découvertes',
+        'mort aux trouvées', 'mort aux cherchés', 'mort aux cherchées',
+        'mort aux recherchés', 'mort aux recherchées', 'mort aux explorés',
+        'mort aux explorées', 'mort aux visités', 'mort aux visitées',
+        'mort aux vus', 'mort aux vues', 'mort aux regardés',
+        'mort aux regardées', 'mort aux observés', 'mort aux observées',
+        'mort aux écoutés', 'mort aux écoutées', 'mort aux entendus',
+        'mort aux entendues', 'mort aux perçus', 'mort aux perçues',
+        'mort aux sentis', 'mort aux senties', 'mort aux touchés',
+        'mort aux touchées', 'mort aux ressentis', 'mort aux ressenties',
+        'mort aux éprouvés', 'mort aux éprouvées', 'mort aux subis',
+        'mort aux subies', 'mort aux endurés', 'mort aux endurées',
+        'mort aux supportés', 'mort aux supportées', 'mort aux tolérés',
+        'mort aux tolérées', 'mort aux acceptés', 'mort aux acceptées',
+        'mort aux refusés', 'mort aux refusées', 'mort aux rejetés',
+        'mort aux rejetées', 'mort aux exclus', 'mort aux exclues',
+        'mort aux bannis', 'mort aux bannies', 'mort aux chassés',
+        'mort aux chassées', 'mort aux expulsés', 'mort aux expulsées',
+        'mort aux évincés', 'mort aux évincées', 'mort aux limogés',
+        'mort aux limogées', 'mort aux renvoyés', 'mort aux renvoyées',
+        'mort aux licenciés', 'mort aux licenciées', 'mort aux démissionnés',
+        'mort aux démissionnées', 'mort aux partis', 'mort aux parties',
+        'mort aux sortis', 'mort aux sorties', 'mort aux partis',
+        'mort aux parties', 'mort aux absents', 'mort aux absentes',
+        'mort aux présents', 'mort aux présentes', 'mort aux ici',
+        'mort aux là', 'mort aux partout', 'mort aux nulle part',
+        'mort aux quelque part', 'mort aux ailleurs', 'mort aux ailleurs',
+        'mort aux ici-bas', 'mort aux là-haut', 'mort aux en bas',
+        'mort aux en haut', 'mort aux à gauche', 'mort aux à droite',
+        'mort aux devant', 'mort aux derrière', 'mort aux dedans',
+        'mort aux dehors', 'mort aux au-delà', 'mort aux en deçà',
+        'mort aux toujours', 'mort aux jamais', 'mort aux parfois',
+        'mort aux rarement', 'mort aux souvent', 'mort aux quelquefois',
+        'mort aux jamais', 'mort aux toujours', 'mort aux maintenant',
+        'mort aux autrefois', 'mort aux jadis', 'mort aux naguère',
+        'mort aux autrefois', 'mort aux désormais', 'mort aux désormais',
+        'mort aux désormais', 'mort aux désormais', 'mort aux désormais'
     ],
 
     // Chat punishment configuration
@@ -1588,6 +1763,123 @@ function setupAuthUI() {
     document.getElementById('login-username').addEventListener('input', handleLoginInput);
 }
 
+async function renderAdminActiveBans() {
+    const container = document.getElementById('active-bans-content');
+    if (!container) return;
+    
+    try {
+        const snapshot = await db.ref('bans').once('value');
+        const bans = snapshot.val() || {};
+        const now = Date.now();
+        
+        let html = '';
+        let hasActiveBans = false;
+        
+        for (const [uid, banData] of Object.entries(bans)) {
+            if (banData && typeof banData.expires_at === 'number' && banData.expires_at > now) {
+                hasActiveBans = true;
+                const remainingMs = banData.expires_at - now;
+                const remaining = formatRemaining(remainingMs);
+                const userName = state.onlineUsers?.[uid]?.name || uid;
+                
+                html += `
+                    <div class="ban-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; margin: 4px 0; background: rgba(255, 255, 255, 0.05); border-radius: 6px; border-left: 3px solid #ff4757;">
+                        <div>
+                            <strong style="color: #fff;">${userName}</strong>
+                            <div style="font-size: 0.85rem; color: #888;">Restant: ${remaining}</div>
+                        </div>
+                        <button class="btn-small" style="background: var(--error); color: white; padding: 4px 8px; font-size: 0.8rem;" onclick="window.removeBanFromList('${uid}')">
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        if (!hasActiveBans) {
+            html = '<p style="color: #888; font-style: italic; text-align: center; padding: 20px;">Aucun ban actif</p>';
+        }
+        
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p style="color: #ff6b6b;">Erreur lors du chargement</p>';
+    }
+}
+
+// Fonction globale pour débannir depuis la liste
+window.removeBanFromList = async (uid) => {
+    if (!confirm('Débannir ce joueur ?')) return;
+    try {
+        await db.ref(`bans/${uid}`).remove();
+        showToast("Joueur débanni", "success");
+        renderAdminActiveBans(); // Rafraîchir la liste
+    } catch (e) {
+        showToast("Erreur", "error");
+    }
+};
+
+async function renderAdminChatPunishments() {
+    const container = document.getElementById('active-chat-punishments-content');
+    if (!container) return;
+    
+    try {
+        const snapshot = await db.ref('chat_punishments').once('value');
+        const punishments = snapshot.val() || {};
+        const now = Date.now();
+        
+        let html = '';
+        let hasActivePunishments = false;
+        
+        for (const [uid, punishment] of Object.entries(punishments)) {
+            if (punishment && typeof punishment.expires_at === 'number' && punishment.expires_at > now) {
+                hasActivePunishments = true;
+                const remainingMs = punishment.expires_at - now;
+                const remaining = formatRemaining(remainingMs);
+                const userName = state.onlineUsers?.[uid]?.name || uid;
+                const type = punishment.type || 'mute';
+                const reason = punishment.reason || 'Non spécifié';
+                const infractions = punishment.infractions || 0;
+                
+                const icon = type === 'ban_chat' ? '🚫' : '🔇';
+                const typeText = type === 'ban_chat' ? 'Banni du chat' : 'Muet du chat';
+                
+                html += `
+                    <div class="ban-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; margin: 4px 0; background: rgba(255, 255, 255, 0.05); border-radius: 6px; border-left: 3px solid ${type === 'ban_chat' ? '#ff4757' : '#ffa502'};">
+                        <div>
+                            <strong style="color: #fff;">${icon} ${userName}</strong>
+                            <div style="font-size: 0.85rem; color: #888;">${typeText} - Restant: ${remaining}</div>
+                            <div style="font-size: 0.75rem; color: #666;">Raison: ${reason} | Infractions: ${infractions}</div>
+                        </div>
+                        <button class="btn-small" style="background: var(--error); color: white; padding: 4px 8px; font-size: 0.8rem;" onclick="window.removeChatPunishment('${uid}')">
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        if (!hasActivePunishments) {
+            html = '<p style="color: #888; font-style: italic; text-align: center; padding: 20px;">Aucun mute/ban chat actif</p>';
+        }
+        
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p style="color: #ff6b6b;">Erreur lors du chargement</p>';
+    }
+}
+
+// Fonction globale pour supprimer une punition chat depuis la liste
+window.removeChatPunishment = async (uid) => {
+    if (!confirm('Supprimer cette punition chat ?')) return;
+    try {
+        await db.ref(`chat_punishments/${uid}`).remove();
+        showToast("Punition supprimée", "success");
+        renderAdminChatPunishments(); // Rafraîchir la liste
+    } catch (e) {
+        showToast("Erreur", "error");
+    }
+};
+
 async function renderAdminCurrentVersion() {
     const container = document.getElementById('admin-current-version');
     const input = document.getElementById('admin-site-version');
@@ -2228,7 +2520,6 @@ function setupAdminListeners() {
             // Si pas d'UID sélectionné, essayer avec le nom hors ligne
             if (!uid) {
                 const offlineName = document.getElementById('admin-ban-offline-name')?.value?.trim();
-                console.log('Tentative de débannissement pour:', offlineName);
                 
                 if (!offlineName) return showToast("Choisis un joueur en ligne ou entre un prénom", "error");
                 
@@ -2237,21 +2528,17 @@ function setupAdminListeners() {
                     u.id.toLowerCase() === offlineName.toLowerCase()
                 );
                 
-                console.log('Whitelist user trouvé:', whitelistUser);
-                
                 // Si pas trouvé, essayer avec prettyName (pour les prénoms avec majuscules)
                 if (!whitelistUser) {
                     whitelistUser = state.whitelistCache.find(u => 
                         prettyName(u.id).toLowerCase() === offlineName.toLowerCase()
                     );
-                    console.log('Whitelist user trouvé avec prettyName:', whitelistUser);
                 }
                 
                 // Si toujours pas trouvé, essayer avec normalizeName (ancienne méthode)
                 if (!whitelistUser) {
                     const normalizedName = normalizeName(offlineName);
                     whitelistUser = state.whitelistCache.find(u => u.id === normalizedName);
-                    console.log('Whitelist user trouvé avec normalizeName:', whitelistUser, 'pour', normalizedName);
                 }
                 
                 if (!whitelistUser) {
@@ -2260,7 +2547,6 @@ function setupAdminListeners() {
                 
                 // Récupérer l'UID Firebase réel depuis le nom
                 const realUid = await findUserUidByName(whitelistUser.id);
-                console.log('UID réel trouvé:', realUid);
                 
                 if (!realUid) {
                     return showToast("Impossible de trouver l'UID du joueur", "error");
@@ -2268,7 +2554,6 @@ function setupAdminListeners() {
                 
                 uid = realUid;
                 targetName = prettyName(whitelistUser.id);
-                console.log('Final - UID:', uid, 'Target:', targetName);
             } else {
                 // Récupérer le nom depuis les joueurs en ligne
                 const onlineUser = state.onlineUsers[uid];
@@ -2276,7 +2561,6 @@ function setupAdminListeners() {
             }
             
             try {
-                console.log('Tentative de suppression du ban pour UID:', uid);
                 await db.ref(`bans/${uid}`).remove();
                 showToast(`${targetName} débanni`, "success");
                 
@@ -2284,16 +2568,16 @@ function setupAdminListeners() {
                 document.getElementById('admin-ban-target').value = '';
                 document.getElementById('admin-ban-offline-name').value = '';
             } catch (e) {
-                console.error('Erreur débannissement:', e);
                 showToast("Erreur débannissement", "error");
             }
         });
         removeBanBtn.hasListener = true;
     }
-    
+
     // Setup chat admin listeners
     setupAdminChatListeners();
 }
+
 function openAdminPanel() {
     // Vérifier si c'est bien l'admin
     if (!state.userProfile || state.userProfile.username_norm !== CONFIG.ADMIN_USER) {
@@ -2339,6 +2623,12 @@ function openAdminPanelAfterCode() {
         
         // Afficher la version actuelle
         renderAdminCurrentVersion();
+        
+        // Afficher les bans actifs
+        renderAdminActiveBans();
+        
+        // Afficher les mutes/bans chat actifs
+        renderAdminChatPunishments();
         
         // Initialiser le toggle pour les infos des cases (une seule fois)
         const pixelInfoToggle = document.getElementById('toggle-pixel-info');
@@ -2499,36 +2789,29 @@ function renderActiveBoosts() {
 
 // Fonction pour trouver l'UID Firebase réel depuis le nom normalisé
 async function findUserUidByName(normalizedName) {
-    console.log('Recherche UID pour:', normalizedName);
     
     // Chercher d'abord dans les joueurs en ligne
     for (const [uid, userData] of Object.entries(state.onlineUsers || {})) {
         if (userData.name && userData.name.toLowerCase() === normalizedName.toLowerCase()) {
-            console.log('UID trouvé en ligne:', uid);
             return uid;
         }
     }
     
     // Si pas trouvé en ligne, chercher dans Firestore
     try {
-        console.log('Recherche dans Firestore pour:', normalizedName);
         const snapshot = await firestore.collection('users')
             .where('username_norm', '==', normalizedName)
             .limit(1)
             .get();
         
-        console.log('Résultat Firestore:', snapshot.empty ? 'vide' : snapshot.docs.length + ' docs');
-        
         if (!snapshot.empty) {
             const uid = snapshot.docs[0].id;
-            console.log('UID trouvé dans Firestore:', uid);
             return uid;
         }
     } catch (error) {
         console.error('Erreur recherche UID:', error);
     }
     
-    console.log('UID non trouvé pour:', normalizedName);
     return null;
 }
 
@@ -4289,27 +4572,19 @@ function playSound(type) {
     } catch (err) {
         // Silencieux - pas d'erreur dans la console pour l'audio
     }
-} // Ajout de l'accolade manquante
+} 
 
 // Initialisation simple
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🔍 DEBUG: DOMContentLoaded fired');
-    
     // S'assurer que Firebase est initialisé
     initFirebase();
     
     // Attendre un peu que Firebase soit prêt si nécessaire
     const setupAuthListener = () => {
-        console.log('🔍 DEBUG: Setting up auth listener...');
-        console.log('🔍 DEBUG: auth type:', typeof auth);
-        console.log('🔍 DEBUG: auth.onAuthStateChanged type:', typeof auth?.onAuthStateChanged);
-        
         if (auth && typeof auth.onAuthStateChanged === 'function') {
-            console.log('🔍 DEBUG: Adding auth state listener...');
             auth.onAuthStateChanged(handleAuthState);
-            console.log('🔍 DEBUG: Auth listener added successfully');
         } else {
-            console.error('❌ DEBUG: Firebase auth not ready, retrying in 500ms...');
+            console.error('❌ Firebase auth not ready, retrying in 500ms...');
             setTimeout(setupAuthListener, 500);
         }
     };
@@ -4321,27 +4596,20 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAuthUI();
     setupAdminListeners();
     setupGlobalUiListeners();
-    setupAdminTabs();
+    auth.onAuthStateChanged(handleAuthState);
+    fetchWhitelist();
 });
 
 // Si le DOM est déjà chargé
 if (document.readyState !== 'loading') {
-    console.log('🔍 DEBUG: DOM already loaded, initializing immediately');
-    
     initFirebase();
     
     // Attendre un peu que Firebase soit prêt si nécessaire
     const setupAuthListenerImmediate = () => {
-        console.log('🔍 DEBUG: Setting up auth listener (immediate)...');
-        console.log('🔍 DEBUG: auth type:', typeof auth);
-        console.log('🔍 DEBUG: auth.onAuthStateChanged type:', typeof auth?.onAuthStateChanged);
-        
         if (auth && typeof auth.onAuthStateChanged === 'function') {
-            console.log('🔍 DEBUG: Adding auth state listener...');
             auth.onAuthStateChanged(handleAuthState);
-            console.log('🔍 DEBUG: Auth listener added successfully');
         } else {
-            console.error('❌ DEBUG: Firebase auth not ready, retrying in 500ms...');
+            console.error('❌ Firebase auth not ready, retrying in 500ms...');
             setTimeout(setupAuthListenerImmediate, 500);
         }
     };
