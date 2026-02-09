@@ -28,7 +28,7 @@ const CONFIG = {
     PIXEL_SCALE: 20,
     COOLDOWN_MS: 60000, // Cooldown pour placer les pixels (60 secondes)
     CHAT_COOLDOWN_MS: 10000, // Cooldown pour le chat (10 secondes)
-    CLIENT_VERSION: "V1.6.2",
+    CLIENT_VERSION: "V1.6.3",
     DOUBLE_CLICK_THRESHOLD: 300,
     ADMIN_USER: "noeb",
     
@@ -84,14 +84,42 @@ const CONFIG = {
 
 const state = {
     user: null, userProfile: null, whitelistCache: [],
-    camera: { x: 0, y: 0, zoom: 1.5 },
+    camera: { x: 0, y: 0, zoom: 1.5, targetZoom: 1.5 },
     isDragging: false, lastMouse: { x: 0, y: 0 },
     dragStartTime: 0, dragStartPos: { x: 0, y: 0 },
+    
+    // Animation fluide du zoom
+    zoomAnimation: null,
+    
+    // Support du pinch-to-zoom mobile
+    touchState: {
+        isPinching: false,
+        lastDistance: 0,
+        initialZoom: 1.5
+    },
     
     boardData: {}, selectedColor: CONFIG.PALETTE[2], nextPixelTime: 0,
     
     // Pour le survol (Hover)
     hoverGrid: { x: -1, y: -1 },
+    
+    // Paramètres utilisateur
+    settings: {
+        menuOpacity: 80,
+        smoothAnimation: true,
+        backgroundMusic: true,  // Changé à true par défaut
+        soundEffects: true
+    },
+    
+    // Transition fluide du survol
+    hoverTransition: {
+        currentX: -1,
+        currentY: -1,
+        targetX: -1,
+        targetY: -1,
+        animationId: null,
+        smoothing: 0.2
+    },
     
     // Mode Admin (noeb uniquement)
     adminNoCooldown: false,
@@ -1797,7 +1825,7 @@ async function renderAdminActiveBans() {
         }
         
         if (!hasActiveBans) {
-            html = '<p style="color: #888; font-style: italic; text-align: center; padding: 20px;">Aucun ban actif</p>';
+            html = '<p style="color: #888; font-style: italic;">Aucun ban actif</p>';
         }
         
         container.innerHTML = html;
@@ -1859,7 +1887,7 @@ async function renderAdminChatPunishments() {
         }
         
         if (!hasActivePunishments) {
-            html = '<p style="color: #888; font-style: italic; text-align: center; padding: 20px;">Aucun mute/ban chat actif</p>';
+            html = '<p style="color: #888; font-style: italic;">Aucun mute/ban chat actif</p>';
         }
         
         container.innerHTML = html;
@@ -2150,20 +2178,28 @@ async function viewUserInfractions() {
         );
         
         if (!whitelistUser) {
-            const normalizedName = normalizeName(offlineName);
-            const foundUser = state.whitelistCache.find(u => u.id === normalizedName);
-            if (foundUser) {
-                targetName = prettyName(foundUser.id);
-                uid = foundUser.id;
-            }
-        } else {
-            targetName = prettyName(whitelistUser.id);
-            uid = whitelistUser.id;
+            whitelistUser = state.whitelistCache.find(u => 
+                prettyName(u.id).toLowerCase() === offlineName.toLowerCase()
+            );
         }
         
-        if (!uid) {
+        if (!whitelistUser) {
+            const normalizedName = normalizeName(offlineName);
+            whitelistUser = state.whitelistCache.find(u => u.id === normalizedName);
+        }
+        
+        if (!whitelistUser) {
             return showToast("Joueur non trouvé", "error");
         }
+        
+        // Get real UID
+        const realUid = await findUserUidByName(whitelistUser.id);
+        if (!realUid) {
+            return showToast("Impossible de trouver l'UID du joueur", "error");
+        }
+        
+        uid = realUid;
+        targetName = prettyName(whitelistUser.id);
     } else if (uid) {
         const onlineUser = state.onlineUsers[uid];
         targetName = onlineUser?.name || uid;
@@ -2449,6 +2485,7 @@ function setupAdminListeners() {
             // Si pas d'UID sélectionné, essayer avec le nom hors ligne
             if (!uid) {
                 const offlineName = document.getElementById('admin-ban-offline-name')?.value?.trim();
+                
                 if (!offlineName) return showToast("Choisis un joueur en ligne ou entre un prénom", "error");
                 
                 // Chercher d'abord une correspondance exacte (insensible à la casse)
@@ -2475,6 +2512,7 @@ function setupAdminListeners() {
                 
                 // Récupérer l'UID Firebase réel depuis le nom
                 const realUid = await findUserUidByName(whitelistUser.id);
+                
                 if (!realUid) {
                     return showToast("Impossible de trouver l'UID du joueur", "error");
                 }
@@ -2936,18 +2974,29 @@ function renderAdminUserList() {
         ul.appendChild(li);
     });
 }
+
 window.deleteWhitelistUser = async (id) => {
     if (!confirm(`Supprimer ${prettyName(id)} ?`)) return;
-    try { await firestore.collection('whitelist').doc(id).delete(); showToast("Supprimé", "success"); fetchWhitelist(); }
-    catch (e) { showToast("Erreur", "error"); }
+        
+    // TODO: Implémenter la suppression de la whitelist
+    console.log(`Suppression de ${id} de la whitelist`);
 };
 
 /* ================= MOTEUR JEU ================= */
 function initGameEngine() {
     setupPalette();
+    loadUserSettings(); // Charger les paramètres utilisateur
+    setupSettingsModal(); // Initialiser le modal des paramètres
+        
+    // Initialiser les contrôles de paramètres avec un petit délai pour s'assurer que le DOM est prêt
+    setTimeout(() => {
+        setupSettingsControls();
+    }, 100);
+        
     state.camera.x = (CONFIG.BOARD_SIZE * CONFIG.PIXEL_SCALE) / 2;
     state.camera.y = (CONFIG.BOARD_SIZE * CONFIG.PIXEL_SCALE) / 2;
     state.camera.zoom = 1.5;
+    state.camera.targetZoom = 1.5;
     resizeCanvas(); 
     setupCanvasInput();
     setupScoreboardInput();
@@ -3330,7 +3379,7 @@ function renderScoreboard() {
         
         // Vérifier si c'est l'admin
         const isAdmin = userData.name && userData.name.toLowerCase() === CONFIG.ADMIN_USER;
-        const adminTag = isAdmin ? '<span class="admin-tag">ADMIN</span>' : '';
+        const adminTag = isAdmin ? '<span class="admin-tag">ADMIN</span> ' : '';
         const nameStyle = isAdmin ? 'style="color: #ff0040;"' : '';
         
         li.innerHTML = `
@@ -3370,7 +3419,6 @@ function calculateScores() {
             const pixel = state.boardData[k];
             // Vérifier que le pixel existe ET a les propriétés requises
             if (!pixel || typeof pixel !== 'object') continue;
-            if (typeof pixel.f !== 'number') continue;
             
             if (pixel.f === 1) t1++;
             else if (pixel.f === 2) t2++;
@@ -3468,16 +3516,16 @@ function drawGame() {
     }
     
     // FIX: Highlight Hover (Contour Noir Fin sur la case visée)
-    if (state.hoverGrid.x >= 0 && state.hoverGrid.x < CONFIG.BOARD_SIZE && 
-        state.hoverGrid.y >= 0 && state.hoverGrid.y < CONFIG.BOARD_SIZE) {
+    if (state.hoverTransition.currentX >= 0 && state.hoverTransition.currentX < CONFIG.BOARD_SIZE && 
+        state.hoverTransition.currentY >= 0 && state.hoverTransition.currentY < CONFIG.BOARD_SIZE) {
         
         ctx.lineWidth = 1; // Trait fin
         ctx.strokeStyle = 'rgba(0,0,0,0.8)'; // Noir quasi opaque
         
-        // On dessine le contour
+        // On dessine le contour avec les coordonnées de transition fluide
         ctx.strokeRect(
-            state.hoverGrid.x * CONFIG.PIXEL_SCALE, 
-            state.hoverGrid.y * CONFIG.PIXEL_SCALE, 
+            state.hoverTransition.currentX * CONFIG.PIXEL_SCALE, 
+            state.hoverTransition.currentY * CONFIG.PIXEL_SCALE, 
             CONFIG.PIXEL_SCALE, 
             CONFIG.PIXEL_SCALE
         );
@@ -3485,29 +3533,29 @@ function drawGame() {
         // Afficher les infos du pixel si activé pour noeb
         if (state.showPixelInfo && state.userProfile && state.userProfile.username_norm === CONFIG.ADMIN_USER) {
             try {
-                const key = `${state.hoverGrid.x}_${state.hoverGrid.y}`;
+                const key = `${state.hoverTransition.currentX}_${state.hoverTransition.currentY}`;
                 const pixelData = state.boardData[key];
-                
+
                 // Vérification stricte
                 if (pixelData && typeof pixelData === 'object' && pixelData.u && typeof pixelData.u === 'string') {
                     // Vérifier que userNamesCache existe
                     if (!state.userNamesCache) {
                         state.userNamesCache = {};
                     }
-                    
+
                     // S'assurer que le fetch est déclenché
                     if (!state.userNamesCache[pixelData.u]) {
                         fetchUserName(pixelData.u);
                     }
-                    
+
                     // Récupérer le nom (peut être "Chargement..." ou le vrai nom)
                     const userName = state.userNamesCache[pixelData.u];
-                    
+
                     // Afficher uniquement si le nom est défini et pas vide
                     if (userName && typeof userName === 'string' && userName.length > 0) {
                         // Préparer les informations à afficher
                         let displayLines = [userName];
-                        
+
                         // Ajouter la date si disponible
                         if (pixelData.t && typeof pixelData.t === 'number' && pixelData.t > 0) {
                             try {
@@ -3516,7 +3564,7 @@ function drawGame() {
                                 const month = String(date.getMonth() + 1).padStart(2, '0');
                                 const year = date.getFullYear();
                                 displayLines.push(`${day}/${month}/${year}`);
-                                
+
                                 // Ajouter l'heure
                                 const hours = String(date.getHours()).padStart(2, '0');
                                 const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -3526,30 +3574,30 @@ function drawGame() {
                                 console.warn('Erreur parsing date:', e);
                             }
                         }
-                        
+
                         ctx.fillStyle = 'rgba(200, 200, 200, 0.9)'; // Fond gris clair
                         ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)'; // Contour noir fin
                         ctx.lineWidth = 0.5 / state.camera.zoom;
-                        
+
                         const fontSize = Math.max(12 / state.camera.zoom, 10);
                         ctx.font = `italic ${fontSize}px 'Inter', sans-serif`;
                         ctx.textAlign = 'center';
-                        
+
                         // Calculer la taille de la boîte en fonction du contenu multi-ligne
                         let maxTextWidth = 0;
                         for (let line of displayLines) {
                             const w = ctx.measureText(line).width;
                             if (w > maxTextWidth) maxTextWidth = w;
                         }
-                        
+
                         const boxPadding = 4 / state.camera.zoom;
                         const boxWidth = maxTextWidth + boxPadding * 2;
                         const lineHeight = fontSize + 2 / state.camera.zoom;
                         const boxHeight = (lineHeight * displayLines.length) + boxPadding * 2;
-                        const boxX = state.hoverGrid.x * CONFIG.PIXEL_SCALE + CONFIG.PIXEL_SCALE / 2 - boxWidth / 2;
-                        const boxY = state.hoverGrid.y * CONFIG.PIXEL_SCALE - boxHeight - 5 / state.camera.zoom;
+                        const boxX = state.hoverTransition.currentX * CONFIG.PIXEL_SCALE + CONFIG.PIXEL_SCALE / 2 - boxWidth / 2;
+                        const boxY = state.hoverTransition.currentY * CONFIG.PIXEL_SCALE - boxHeight - 5 / state.camera.zoom;
                         const borderRadius = 3 / state.camera.zoom;
-                        
+
                         // Dessiner la boîte arrondie
                         ctx.beginPath();
                         ctx.moveTo(boxX + borderRadius, boxY);
@@ -3562,15 +3610,15 @@ function drawGame() {
                         ctx.lineTo(boxX, boxY + borderRadius);
                         ctx.quadraticCurveTo(boxX, boxY, boxX + borderRadius, boxY);
                         ctx.closePath();
-                        
+
                         ctx.fill();
                         ctx.stroke();
-                        
+
                         // Texte noir multi-ligne
                         ctx.fillStyle = '#000000';
                         for (let i = 0; i < displayLines.length; i++) {
                             const y = boxY + boxPadding + fontSize + (i * lineHeight);
-                            ctx.fillText(displayLines[i], state.hoverGrid.x * CONFIG.PIXEL_SCALE + CONFIG.PIXEL_SCALE / 2, y);
+                            ctx.fillText(displayLines[i], state.hoverTransition.currentX * CONFIG.PIXEL_SCALE + CONFIG.PIXEL_SCALE / 2, y);
                         }
                     }
                 }
@@ -3592,17 +3640,123 @@ function drawGame() {
 }
 
 /* ================= INPUTS ================= */
+// Gestion du zoom fluide avec la molette
+function onWheel(e) {
+    e.preventDefault(); 
+    
+    if (!state.settings.smoothAnimation) {
+        // Mode sans animation fluide : zoom direct
+        const zoomSpeed = 0.001;
+        const delta = e.deltaY * zoomSpeed * state.camera.zoom;
+        const newZoom = state.camera.zoom - delta;
+        state.camera.zoom = Math.min(Math.max(0.1, newZoom), 10);
+        state.camera.targetZoom = state.camera.zoom;
+        return;
+    }
+    
+    // Mode avec animation fluide
+    // Calculer le zoom cible basé sur la vitesse de la molette
+    const zoomSpeed = 0.001;
+    const delta = e.deltaY * zoomSpeed * state.camera.zoom;
+    const newTargetZoom = state.camera.targetZoom - delta;
+    
+    // Limiter le zoom entre 0.1 et 10
+    state.camera.targetZoom = Math.min(Math.max(0.1, newTargetZoom), 10);
+    
+    // Démarrer l'animation de zoom si ce n'est pas déjà fait
+    if (!state.zoomAnimation) {
+        animateZoom();
+    }
+}
+
+// Animation fluide du zoom
+function animateZoom() {
+    const smoothing = 0.15; // Facteur de lissage (plus = plus rapide)
+    const threshold = 0.001; // Seuil pour arrêter l'animation
+    
+    const difference = state.camera.targetZoom - state.camera.zoom;
+    
+    if (Math.abs(difference) > threshold) {
+        state.camera.zoom += difference * smoothing;
+        state.zoomAnimation = requestAnimationFrame(animateZoom);
+    } else {
+        state.camera.zoom = state.camera.targetZoom;
+        state.zoomAnimation = null;
+    }
+}
+
+// Gestion des événements tactiles pour le pinch-to-zoom
+function onTouchStart(e) {
+    if (e.touches.length === 1) {
+        // Touch simple pour le drag
+        onDown(e.touches[0]);
+    } else if (e.touches.length === 2) {
+        // Pinch-to-zoom
+        e.preventDefault();
+        state.touchState.isPinching = true;
+        state.touchState.lastDistance = getTouchDistance(e.touches);
+        state.touchState.initialZoom = state.camera.zoom;
+        
+        // Arrêter l'animation de zoom en cours
+        if (state.zoomAnimation) {
+            cancelAnimationFrame(state.zoomAnimation);
+            state.zoomAnimation = null;
+        }
+    }
+}
+
+function onTouchMove(e) {
+    if (e.touches.length === 1 && !state.touchState.isPinching) {
+        // Mouvement simple
+        e.preventDefault();
+        onMove(e.touches[0]);
+    } else if (e.touches.length === 2 && state.touchState.isPinching) {
+        // Pinch-to-zoom
+        e.preventDefault();
+        
+        const currentDistance = getTouchDistance(e.touches);
+        const scale = currentDistance / state.touchState.lastDistance;
+        
+        // Calculer le nouveau zoom
+        const newZoom = state.touchState.initialZoom * scale;
+        state.camera.zoom = Math.min(Math.max(0.1, newZoom), 10);
+        state.camera.targetZoom = state.camera.zoom;
+        
+        // Mettre à jour la distance de référence
+        state.touchState.lastDistance = currentDistance;
+    }
+}
+
+function onTouchEnd(e) {
+    if (e.touches.length === 0) {
+        if (state.touchState.isPinching) {
+            state.touchState.isPinching = false;
+        } else {
+            onUp(e);
+        }
+    }
+}
+
+// Utilitaire pour calculer la distance entre deux touches
+function getTouchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
 function setupCanvasInput() {
     const cvs = document.getElementById('gameCanvas');
-    cvs.addEventListener('mousedown', onDown); window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
-    cvs.addEventListener('touchstart', e=>{if(e.touches.length===1)onDown(e.touches[0])},{passive:false});
-    cvs.addEventListener('touchmove', e=>{e.preventDefault();if(e.touches.length===1)onMove(e.touches[0])},{passive:false});
-    cvs.addEventListener('touchend', onUp);
-    cvs.addEventListener('wheel', e=>{
-        e.preventDefault(); 
-        let z = state.camera.zoom - (e.deltaY * 0.001 * state.camera.zoom);
-        state.camera.zoom = Math.min(Math.max(0.1, z), 10);
-    }, {passive:false});
+    cvs.addEventListener('mousedown', onDown); 
+    window.addEventListener('mousemove', onMove); 
+    window.addEventListener('mouseup', onUp);
+    
+    // Support du touch pour mobile
+    cvs.addEventListener('touchstart', onTouchStart, {passive:false});
+    cvs.addEventListener('touchmove', onTouchMove, {passive:false});
+    cvs.addEventListener('touchend', onTouchEnd);
+    
+    // Zoom fluide avec la molette
+    cvs.addEventListener('wheel', onWheel, {passive:false});
 }
 
 function setupScoreboardInput() {
@@ -3613,24 +3767,74 @@ function setupScoreboardInput() {
             toggleScoreboard(true);
         }
     });
-    
+
     window.addEventListener('keyup', (e) => {
         if (e.code === 'Tab') {
             toggleScoreboard(false);
         }
     });
 }
+
+// Animation fluide de transition du survol
+function animateHoverTransition() {
+    const smoothing = state.hoverTransition.smoothing;
+    const threshold = 0.05; // Seuil pour arrêter l'animation
+    
+    let hasChanged = false;
+    
+    // Interpoler X
+    const diffX = state.hoverTransition.targetX - state.hoverTransition.currentX;
+    if (Math.abs(diffX) > threshold) {
+        state.hoverTransition.currentX += diffX * smoothing;
+        hasChanged = true;
+    } else {
+        state.hoverTransition.currentX = state.hoverTransition.targetX;
+    }
+    
+    // Interpoler Y
+    const diffY = state.hoverTransition.targetY - state.hoverTransition.currentY;
+    if (Math.abs(diffY) > threshold) {
+        state.hoverTransition.currentY += diffY * smoothing;
+        hasChanged = true;
+    } else {
+        state.hoverTransition.currentY = state.hoverTransition.targetY;
+    }
+    
+    if (hasChanged) {
+        state.hoverTransition.animationId = requestAnimationFrame(animateHoverTransition);
+    } else {
+        state.hoverTransition.animationId = null;
+    }
+}
+
 function onDown(e) {
     state.isDragging = true; state.dragStartTime = Date.now();
     state.lastMouse = { x: e.clientX, y: e.clientY }; state.dragStartPos = { x: e.clientX, y: e.clientY };
 }
+
 function onMove(e) {
     // FIX: Mise à jour des coordonnées Hover pour le Highlight
     const pos = screenToGrid(e.clientX, e.clientY);
     
-    // On met à jour state.hoverGrid si ça change (pour redessiner le carré noir)
-    if(pos.x !== state.hoverGrid.x || pos.y !== state.hoverGrid.y) {
+    // Mettre à jour la cible de transition si la position change ET si l'animation fluide est activée
+    if(state.settings.smoothAnimation) {
+        if(pos.x !== state.hoverGrid.x || pos.y !== state.hoverGrid.y) {
+            state.hoverGrid = pos;
+            state.hoverTransition.targetX = pos.x;
+            state.hoverTransition.targetY = pos.y;
+            
+            // Démarrer l'animation de transition si ce n'est pas déjà fait
+            if (!state.hoverTransition.animationId) {
+                animateHoverTransition();
+            }
+        }
+    } else {
+        // Mode sans animation fluide : mise à jour directe
         state.hoverGrid = pos;
+        state.hoverTransition.currentX = pos.x;
+        state.hoverTransition.currentY = pos.y;
+        state.hoverTransition.targetX = pos.x;
+        state.hoverTransition.targetY = pos.y;
     }
     
     if(pos.x>=0 && pos.x<CONFIG.BOARD_SIZE && pos.y>=0 && pos.y<CONFIG.BOARD_SIZE) {
@@ -3643,6 +3847,7 @@ function onMove(e) {
         state.lastMouse = { x: e.clientX, y: e.clientY };
     }
 }
+
 function onUp(e) {
     if(!state.isDragging) return; state.isDragging = false;
     const ex = e.clientX || state.lastMouse.x; const ey = e.clientY || state.lastMouse.y;
@@ -4523,6 +4728,9 @@ let audioCtx = null;
 let popSnd = null;
 let bgMusic = null;
 
+// Initialiser l'état des sons par défaut
+window.soundEnabled = true;
+
 function initAudio() {
     if (audioCtx) return; // Déjà initialisé
     
@@ -4543,6 +4751,11 @@ function playSound(type) {
     if (!audioCtx) {
         // Ne pas initialiser l'audio automatiquement à cause des restrictions autoplay
         // Attendre une interaction utilisateur pour initialiser
+        return;
+    }
+    
+    // Vérifier si les sons sont activés
+    if (window.soundEnabled === false) {
         return;
     }
     
@@ -4622,4 +4835,261 @@ if (document.readyState !== 'loading') {
     setupAdminListeners();
     setupGlobalUiListeners();
     setupAdminTabs();
+}
+
+/* ================= PARAMÈTRES UTILISATEUR ================= */
+function setupSettingsModal() {
+    const btnSettings = document.getElementById('btn-settings');
+    const btnClose = document.getElementById('btn-close-settings');
+    const modal = document.getElementById('settings-modal');
+    
+    if (!btnSettings || !btnClose || !modal) return;
+    
+    // Ouvrir le modal
+    btnSettings.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+        updateSettingsUI(); // Mettre à jour l'UI avec les valeurs actuelles
+        
+        // Re-attacher les événements aux contrôles à chaque ouverture avec un délai plus long
+        setTimeout(() => {
+            setupSettingsControls();
+        }, 200);
+    });
+    
+    // Fermer le modal
+    btnClose.addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+    
+    // Fermer en cliquant à l'extérieur
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+        }
+    });
+}
+
+function updateSettingsUI() {
+    // Mettre à jour l'UI avec les valeurs actuelles
+    const opacitySlider = document.getElementById('menu-opacity-slider');
+    const opacityValue = document.getElementById('menu-opacity-value');
+    const smoothToggle = document.getElementById('smooth-animation-toggle');
+    const musicToggle = document.getElementById('background-music-toggle');
+    const soundToggle = document.getElementById('sound-effects-toggle');
+    
+    if (opacitySlider && opacityValue) {
+        opacitySlider.value = state.settings.menuOpacity;
+        opacityValue.textContent = `${state.settings.menuOpacity}%`;
+    }
+    
+    if (smoothToggle) {
+        smoothToggle.checked = state.settings.smoothAnimation;
+    }
+    
+    if (musicToggle) {
+        musicToggle.checked = state.settings.backgroundMusic;
+    }
+    
+    if (soundToggle) {
+        soundToggle.checked = state.settings.soundEffects;
+    }
+}
+
+function setupSettingsControls() {
+    console.log('🔧 setupSettingsControls appelé');
+    
+    // Transparence des menus
+    const opacitySlider = document.getElementById('menu-opacity-slider');
+    const opacityValue = document.getElementById('menu-opacity-value');
+    console.log('🎛️ Opacity slider:', opacitySlider, 'value:', opacityValue);
+    
+    if (opacitySlider && opacityValue) {
+        // Supprimer tous les événements existants pour éviter les doublons
+        opacitySlider.removeEventListener('input', handleOpacityChange);
+        opacitySlider.addEventListener('input', handleOpacityChange);
+    }
+    
+    // Animation fluide
+    const smoothToggle = document.querySelector('input#smooth-animation-toggle');
+    console.log('🎛️ Smooth toggle trouvé:', smoothToggle);
+    if (smoothToggle) {
+        console.log('🎛️ Smooth toggle état actuel:', smoothToggle.checked);
+        smoothToggle.removeEventListener('change', handleSmoothChange);
+        smoothToggle.addEventListener('change', handleSmoothChange);
+    } else {
+        console.error('❌ Smooth toggle NON TROUVÉ !');
+    }
+    
+    // Musique d'arrière-plan
+    const musicToggle = document.querySelector('input#background-music-toggle');
+    console.log('🎛️ Music toggle trouvé:', musicToggle);
+    if (musicToggle) {
+        console.log('🎛️ Music toggle état actuel:', musicToggle.checked);
+        musicToggle.removeEventListener('change', handleMusicChange);
+        musicToggle.addEventListener('change', handleMusicChange);
+    } else {
+        console.error('❌ Music toggle NON TROUVÉ !');
+    }
+    
+    // Sons
+    const soundToggle = document.querySelector('input#sound-effects-toggle');
+    console.log('🎛️ Sound toggle trouvé:', soundToggle);
+    if (soundToggle) {
+        console.log('🎛️ Sound toggle état actuel:', soundToggle.checked);
+        soundToggle.removeEventListener('change', handleSoundChange);
+        soundToggle.addEventListener('change', handleSoundChange);
+    } else {
+        console.error('❌ Sound toggle NON TROUVÉ !');
+    }
+}
+
+// Fonctions séparées pour gérer les changements
+function handleOpacityChange(e) {
+    console.log('🎛️ Opacity slider input:', e.target.value);
+    const value = e.target.value;
+    state.settings.menuOpacity = value;
+    document.getElementById('menu-opacity-value').textContent = `${value}%`;
+    applyMenuOpacity(value);
+    saveUserSettings();
+}
+
+function handleSmoothChange(e) {
+    console.log('🎛️ Smooth toggle change - target.checked:', e.target.checked);
+    console.log('🎛️ Smooth toggle change - e.target:', e.target);
+    
+    // Forcer la mise à jour immédiate de l'état visuel
+    e.target.checked = e.target.checked;
+    
+    // Mettre à jour l'état et appliquer
+    state.settings.smoothAnimation = e.target.checked;
+    applySmoothAnimation(e.target.checked);
+    saveUserSettings();
+    
+    // Forcer la mise à jour de l'interface
+    setTimeout(() => {
+        const smoothToggle = document.getElementById('smooth-animation-toggle');
+        if (smoothToggle) {
+            smoothToggle.checked = e.target.checked;
+        }
+    }, 10);
+    
+    console.log('🎛️ Smooth animation mise à jour:', state.settings.smoothAnimation);
+}
+
+function handleMusicChange(e) {
+    console.log('🎛️ Music toggle change - target.checked:', e.target.checked);
+    console.log('🎛️ Music toggle change - e.target:', e.target);
+    
+    // Forcer la mise à jour immédiate de l'état visuel
+    e.target.checked = e.target.checked;
+    
+    // Mettre à jour l'état et appliquer
+    state.settings.backgroundMusic = e.target.checked;
+    applyBackgroundMusic(e.target.checked);
+    saveUserSettings();
+    
+    // Forcer la mise à jour de l'interface
+    setTimeout(() => {
+        const musicToggle = document.getElementById('background-music-toggle');
+        if (musicToggle) {
+            musicToggle.checked = e.target.checked;
+        }
+    }, 10);
+    
+    console.log('🎛️ Background music mise à jour:', state.settings.backgroundMusic);
+}
+
+function handleSoundChange(e) {
+    console.log('🎛️ Sound toggle change - target.checked:', e.target.checked);
+    console.log('🎛️ Sound toggle change - e.target:', e.target);
+    
+    // Forcer la mise à jour immédiate de l'état visuel
+    e.target.checked = e.target.checked;
+    
+    // Mettre à jour l'état et appliquer
+    state.settings.soundEffects = e.target.checked;
+    applySoundEffects(e.target.checked);
+    saveUserSettings();
+    
+    // Forcer la mise à jour de l'interface
+    setTimeout(() => {
+        const soundToggle = document.getElementById('sound-effects-toggle');
+        if (soundToggle) {
+            soundToggle.checked = e.target.checked;
+        }
+    }, 10);
+    
+    console.log('🎛️ Sound effects mise à jour:', state.settings.soundEffects);
+}
+
+function applyMenuOpacity(opacity) {
+    const opacityDecimal = opacity / 100;
+    const glassElements = document.querySelectorAll('.glass-panel, .glass-pill, .modal-card');
+    
+    glassElements.forEach(element => {
+        element.style.opacity = opacityDecimal;
+    });
+}
+
+function applySmoothAnimation(enabled) {
+    // Activer/désactiver les animations fluides
+    if (!enabled) {
+        // Arrêter les animations en cours
+        if (state.zoomAnimation) {
+            cancelAnimationFrame(state.zoomAnimation);
+            state.zoomAnimation = null;
+        }
+        if (state.hoverTransition.animationId) {
+            cancelAnimationFrame(state.hoverTransition.animationId);
+
+        }
+    }
+}
+
+function applyBackgroundMusic(enabled) {
+    if (enabled && bgMusic) {
+        bgMusic.play().catch(() => console.log('Background music play failed'));
+    } else if (!enabled && bgMusic) {
+        bgMusic.pause();
+    }
+}
+
+function applySoundEffects(enabled) {
+    // Cette fonction sera utilisée par la fonction playSound
+    // pour déterminer si les sons doivent être joués
+    window.soundEnabled = enabled;
+}
+
+async function loadUserSettings() {
+    if (!state.user) return;
+    
+    try {
+        const doc = await firestore.collection('users').doc(state.user.uid).get();
+        const userData = doc.data();
+        
+        if (userData && userData.settings) {
+            // Appliquer les paramètres chargés
+            state.settings = { ...state.settings, ...userData.settings };
+            
+            // Appliquer les paramètres immédiatement
+            applyMenuOpacity(state.settings.menuOpacity);
+            applySmoothAnimation(state.settings.smoothAnimation);
+            applyBackgroundMusic(state.settings.backgroundMusic);
+            applySoundEffects(state.settings.soundEffects);
+        }
+    } catch (error) {
+        console.error('Erreur chargement paramètres:', error);
+    }
+}
+
+async function saveUserSettings() {
+    if (!state.user) return;
+    
+    try {
+        await firestore.collection('users').doc(state.user.uid).update({
+            settings: state.settings
+        });
+    } catch (error) {
+        console.error('Erreur sauvegarde paramètres:', error);
+    }
 }

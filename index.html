@@ -168,6 +168,11 @@
                     <i class="ph ph-crown"></i>
                 </button>
                 
+                <!-- Bouton Paramètres -->
+                <button id="btn-settings" title="Paramètres">
+                    <i class="ph ph-gear"></i>
+                </button>
+                
                 <button id="btn-logout" title="Déconnexion"><i class="ph ph-sign-out"></i></button>
             </div>
         </div>
@@ -415,6 +420,66 @@
                             <span class="btn-text">Supprimer</span>
                             <i class="ph ph-trash"></i>
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- 8. SETTINGS MODAL                        -->
+    <!-- ========================================= -->
+    <div id="settings-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2>Paramètres</h2>
+                <button class="btn-close" id="btn-close-settings"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <div class="settings-content">
+                <!-- Transparence des menus -->
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <i class="ph ph-drop"></i>
+                        Transparence des menus
+                        <span class="setting-value" id="menu-opacity-value">80%</span>
+                    </label>
+                    <input type="range" id="menu-opacity-slider" min="20" max="100" value="80" class="setting-slider">
+                </div>
+                
+                <!-- Animation fluide -->
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <i class="ph ph-smiley"></i>
+                        Animation fluide
+                    </label>
+                    <div class="modern-toggle">
+                        <input type="checkbox" id="smooth-animation-toggle" checked>
+                        <div class="modern-toggle-slider"></div>
+                    </div>
+                </div>
+                
+                <!-- Musique d'arrière-plan -->
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <i class="ph ph-music-notes"></i>
+                        Musique d'arrière-plan
+                    </label>
+                    <div class="modern-toggle">
+                        <input type="checkbox" id="background-music-toggle" checked>
+                        <div class="modern-toggle-slider"></div>
+                    </div>
+                </div>
+                
+                <!-- Sons -->
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <i class="ph ph-speaker-high"></i>
+                        Sons (bips, etc.)
+                    </label>
+                    <div class="modern-toggle">
+                        <input type="checkbox" id="sound-effects-toggle" checked>
+                        <div class="modern-toggle-slider"></div>
                     </div>
                 </div>
             </div>
